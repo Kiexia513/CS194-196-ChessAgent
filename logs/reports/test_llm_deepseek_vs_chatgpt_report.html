@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Game Report - test_llm_deepseek_vs_chatgpt</title>
+    <style>
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+        }
+        
+        .game-info {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        
+        .game-info p {
+            background: rgba(255,255,255,0.2);
+            padding: 10px 20px;
+            border-radius: 5px;
+        }
+        
+        .players {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 30px;
+        }
+        
+        .player-card {
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .player-card.white {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-left: 5px solid #4a5568;
+        }
+        
+        .player-card.black {
+            background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+            color: white;
+            border-left: 5px solid #cbd5e0;
+        }
+        
+        .player-card h2 {
+            font-size: 1.8em;
+            margin-bottom: 20px;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        
+        .metric-item {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 5px;
+        }
+        
+        .metric-item.black {
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .metric-label {
+            font-size: 0.9em;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+        
+        .metric-value {
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+        
+        .charts-section {
+            padding: 30px;
+            background: #f7fafc;
+        }
+        
+        .charts-section h2 {
+            margin-bottom: 30px;
+            color: #2d3748;
+        }
+        
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .chart-container h3 {
+            margin-bottom: 15px;
+            color: #4a5568;
+        }
+        
+        .game-replay {
+            padding: 30px;
+        }
+        
+        .game-replay h2 {
+            margin-bottom: 20px;
+            color: #2d3748;
+        }
+        
+        .pgn-section {
+            margin-bottom: 30px;
+        }
+        
+        .pgn {
+            background: #2d3748;
+            color: #cbd5e0;
+            padding: 20px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        .moves-container {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .moves-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .moves-table th {
+            background: #4a5568;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            position: sticky;
+            top: 0;
+        }
+        
+        .moves-table td {
+            padding: 10px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .moves-table tr:hover {
+            background: #f7fafc;
+        }
+        
+        .move-number {
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .move-uci {
+            font-family: 'Courier New', monospace;
+            background: #edf2f7;
+            padding: 4px 8px;
+            border-radius: 3px;
+        }
+        
+        .quality-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        
+        .quality-best { background: #48bb78; color: white; }
+        .quality-excellent { background: #38a169; color: white; }
+        .quality-good { background: #68d391; color: white; }
+        .quality-inaccuracy { background: #f6e05e; color: #744210; }
+        .quality-mistake { background: #fc8181; color: white; }
+        .quality-blunder { background: #f56565; color: white; }
+        .quality-catastrophic { background: #c53030; color: white; }
+        
+        .board-ascii {
+            font-family: 'Courier New', monospace;
+            font-size: 0.8em;
+            background: #2d3748;
+            color: #cbd5e0;
+            padding: 10px;
+            border-radius: 5px;
+            white-space: pre;
+            overflow-x: auto;
+        }
+        
+        footer {
+            background: #2d3748;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .players {
+                grid-template-columns: 1fr;
+            }
+            
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+    </style>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏆 Chess Game Assessment Report</h1>
+            <div class="game-info">
+                <p><strong>Game ID:</strong> test_llm_deepseek_vs_chatgpt</p>
+                <p><strong>Date:</strong> 2025-12-09T17:13:25.030731</p>
+                <p><strong>Result:</strong> *</p>
+                <p><strong>Total Moves:</strong> 20</p>
+            </div>
+        </header>
+        
+        <section class="players">
+            <div class="player-card white">
+                <h2>⚪ Test DeepSeek</h2>
+                
+            <div class="metrics-grid">
+                <div class="metric-item white">
+                    <div class="metric-label">ACPL</div>
+                    <div class="metric-value">257.70</div>
+                </div>
+                <div class="metric-item white">
+                    <div class="metric-label">Estimated ELO</div>
+                    <div class="metric-value">1185</div>
+                </div>
+                <div class="metric-item white">
+                    <div class="metric-label">Skill Level</div>
+                    <div class="metric-value" style="font-size: 1em;">Beginner (< 1400 ELO)</div>
+                </div>
+                <div class="metric-item white">
+                    <div class="metric-label">Blunders</div>
+                    <div class="metric-value">2</div>
+                </div>
+                <div class="metric-item white">
+                    <div class="metric-label">Mistakes</div>
+                    <div class="metric-value">1</div>
+                </div>
+                <div class="metric-item white">
+                    <div class="metric-label">Tactical Moves</div>
+                    <div class="metric-value">0</div>
+                </div>
+                <div class="metric-item white">
+                    <div class="metric-label">Total Time</div>
+                    <div class="metric-value">316.0s</div>
+                </div>
+                <div class="metric-item white">
+                    <div class="metric-label">Best Moves</div>
+                    <div class="metric-value">1</div>
+                </div>
+            </div>
+        
+            </div>
+            <div class="player-card black">
+                <h2>⚫ Test ChatGPT</h2>
+                
+            <div class="metrics-grid">
+                <div class="metric-item black">
+                    <div class="metric-label">ACPL</div>
+                    <div class="metric-value">295.50</div>
+                </div>
+                <div class="metric-item black">
+                    <div class="metric-label">Estimated ELO</div>
+                    <div class="metric-value">1109</div>
+                </div>
+                <div class="metric-item black">
+                    <div class="metric-label">Skill Level</div>
+                    <div class="metric-value" style="font-size: 1em;">Beginner (< 1400 ELO)</div>
+                </div>
+                <div class="metric-item black">
+                    <div class="metric-label">Blunders</div>
+                    <div class="metric-value">2</div>
+                </div>
+                <div class="metric-item black">
+                    <div class="metric-label">Mistakes</div>
+                    <div class="metric-value">0</div>
+                </div>
+                <div class="metric-item black">
+                    <div class="metric-label">Tactical Moves</div>
+                    <div class="metric-value">0</div>
+                </div>
+                <div class="metric-item black">
+                    <div class="metric-label">Total Time</div>
+                    <div class="metric-value">98.8s</div>
+                </div>
+                <div class="metric-item black">
+                    <div class="metric-label">Best Moves</div>
+                    <div class="metric-value">1</div>
+                </div>
+            </div>
+        
+            </div>
+        </section>
+        
+        
+        <section class="charts-section">
+            <h2>📊 Performance Charts</h2>
+            <div class="chart-container">
+                <h3>ACPL Trend Over Moves</h3>
+                <div id="acpl-chart"></div>
+            </div>
+            <div class="chart-container">
+                <h3>Move Quality Distribution</h3>
+                <div id="quality-chart"></div>
+            </div>
+            <div class="chart-container">
+                <h3>Thinking Time Analysis</h3>
+                <div id="time-chart"></div>
+            </div>
+        </section>
+        
+        
+        <section class="game-replay">
+            <h2>📋 Game Replay</h2>
+            <div class="pgn-section">
+                <h3>PGN Notation</h3>
+                <pre class="pgn">1. e4 e5 2. d4 exd4 3. Qg4 d6 4. Bb5+ Bd7 5. Bxd7+ Ke7 6. Qh3 Nf6 7. Bg4 b6 8. Qh4 Qc8 9. Bf5 Ke8 10. Bxh7 g6</pre>
+            </div>
+            <div class="moves-section">
+                <h3>Move-by-Move Analysis</h3>
+                <div class="moves-container">
+                    
+        <table class="moves-table">
+            <thead>
+                <tr>
+                    <th>Move</th>
+                    <th>Player</th>
+                    <th>UCI</th>
+                    <th>SAN</th>
+                    <th>Quality</th>
+                    <th>CP Loss</th>
+                    <th>Time</th>
+                    <th>Reasoning</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+                <tr>
+                    <td class="move-number">1</td>
+                    <td><strong>WHITE</strong></td>
+                    <td><span class="move-uci">e2e4</span></td>
+                    <td>e4</td>
+                    <td><span class="quality-badge quality-best">Best</span></td>
+                    <td>0</td>
+                    <td>8.88s</td>
+                    <td style="font-size: 0.85em; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">This is the starting position of a standard chess game. The move e2e4 is one of the strongest and mo...</td>
+                </tr>
+            
+                <tr>
+                    <td class="move-number">2</td>
+                    <td><strong>BLACK</strong></td>
+                    <td><span class="move-uci">e7e5</span></td>
+                    <td>e5</td>
+                    <td><span class="quality-badge quality-excellent">Excellent</span></td>
+                    <td>6</td>
+                    <td>3.94s</td>
+                    <td style="font-size: 0.85em; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">This move advances the pawn to e5, controlling the center and challenging White's pawn on e4. It als...</td>
+                </tr>
+            
+                <tr>
+                    <td class="move-number">3</td>
+                    <td><strong>WHITE</strong></td>
+                    <td><span class="move-uci">d2d4</span></td>
+                    <td>d4</td>
+                    <td><span class="quality-badge quality-inaccuracy">Inaccuracy</span></td>
+                    <td>33</td>
+                    <td>9.47s</td>
+                    <td style="font-size: 0.85em; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">The position is the King's Pawn Game after 1.e4 e5. White's best move is to challenge the center imm...</td>
+                </tr>
+            
+                <tr>
+                    <td class="move-number">4</td>
+                    <td><strong>BLACK</strong></td>
+                    <td><span class="move-uci">e5d4</span></td>
+                    <td>exd4</td>
+                    <td><span class="quality-badge quality-best">Best</span></td>
+                    <td>0</td>
+                    <td>2.99s</td>
+                    <td style="font-size: 0.85em; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">This move captures the pawn on d4, gaining material and opening lines for further piece activity. It...</td>
+                </tr>
+            
+                <tr>
+                    <td class="move-number">5</td>
+                    <td><strong>WHITE</strong></td>
+                    <td><span class="move-uci">d1g4</span></td>
+                    <td>Qg4</td>
+                    <td><span class="quality-badge quality-catastrophic">Catastrophic</span></td>
+                    <td>200</td>
+                    <td>41.15s</td>
+                    <td style="font-size: 0.85em; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">The FEN rnbqkbnr/pppp1ppp/8/8/3pP3/8/PPP2PPP/RNBQKBNR w KQkq - 0 3 indicates it is White's turn. The...</td>
+                </tr>
+            
+                <tr>
+                    <td class="move-number">6</td>
+                    <td><strong>BLACK</strong></td>
+                    <td><span class="move-uci">d7d6</span></td>
+                    <td>d6</td>
+                    <td><span class="quality-badge quality-blunder">Blunder</span></td>
+                    <td>81</td>
+                    <td>16.64s</td>
+                    <td style="font-size: 0.85em; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">This move advances the queen's pawn to e5, directly attacking the black pawn on d5 and gaining contr...</td>
+                </tr>
+            
+                <tr>
+                    <td class="move-number">7</td>
+                    <td><strong>WHITE</strong></td>
+                    <td><span class="move-uci">f1b5</span></td>
+                    <td>Bb5+</td>
+                    <td><span class="quality-badge quality-catastrophic">Catastrophic</span></td>
+                    <td>356</td>
+                    <td>41.82s</td>
+                    <td style="font-size: 0.85em; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">The FEN indicates it is White's turn (w) after Black's third move. The position shows White's queen ...</td>
+                </tr>
+            
+                <tr>
+                    <td class="move-number">8</td>
+                    <td><strong>BLACK</strong></td>
+                    <td><span class="move-uci">c8d7</span></td>
+                    <td>Bd7</td>
+                    <td><span class="quality-badge quality-catastrophic">Catastrophic</span></td>
+                    <td>378</td>
+                    <td>13.97s</td>
+                    <td style="font-size: 0.85em; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">This move advances the queen's pawn to g5, creating a direct threat against the f6 knight. It also o...</td>
+                </tr>
+            
+                <tr>
+                    <td class="move-number">9</td>
+                    <td><strong>WHITE</strong></td>
+                    <td><span class="move-uci">b5d7</span></td>
+                    <td>Bxd7+</td>
+                    <td><span class="quality-badge quality-blunder">Blunder</span></td>
+                    <td>84</td>
+                    <td>10.42s</td>
+                    <td style="font-size: 0.85em; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">The position is tactically rich. White's bishop on b5 is pinned against the queen on d7, but Black's...</td>
+                </tr>
+            
+                <tr>
+                    <td class="move-number">10</td>
+                    <td><strong>BLACK</strong></td>
+                    <td><span class="move-uci">e8e7</span></td>
+                    <td>Ke7</td>
+                    <td><span class="quality-badge quality-catastrophic">Catastrophic</span></td>
+                    <td>725</td>
+                    <td>12.84s</td>
+                    <td style="font-size: 0.85em; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">This move advances the pawn to d4, attacking the queen on e4 and forcing it to move. It also helps t...</td>
+                </tr>
+            
+                <tr>
+                    <td class="move-number">11</td>
+                    <td><strong>WHITE</strong></td>
+                    <td><span class="move-uci">g4h3</span></td>
+                    <td>Qh3</td>
+                    <td><span class="quality-badge quality-catastrophic">Catastrophic</span></td>
+                    <td>513</td>
+                    <td>96.66s</td>
+                    <td style="font-size: 0.85em; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">The FEN shows White to move. The key feature is a white bishop on d7, which is attacking the black k...</td>
+                </tr>
+            
+                <tr>
+                    <td class="move-number">12</td>
+                    <td><strong>BLACK</strong></td>
+                    <td><span class="move-uci">g8f6</span></td>
+                    <td>Nf6</td>
+                    <td><span class="quality-badge quality-catastrophic">Catastrophic</span></td>
+                    <td>469</td>
+                    <td>15.66s</td>
+                    <td style="font-size: 0.85em; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">This move advances the pawn to d4, attacking the queen on h4 and forcing it to move. It also maintai...</td>
+                </tr>
+            
+                <tr>
+                    <td class="move-number">13</td>
+                    <td><strong>WHITE</strong></td>
+                    <td><span class="move-uci">d7g4</span></td>
+                    <td>Bg4</td>
+                    <td><span class="quality-badge quality-mistake">Mistake</span></td>
+                    <td>42</td>
+                    <td>40.01s</td>
+                    <td style="font-size: 0.85em; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">The FEN shows it is White's turn (w). The bishop on d7 is attacking the black king on e8. The black ...</td>
+                </tr>
+            
+                <tr>
+                    <td class="move-number">14</td>
+                    <td><strong>BLACK</strong></td>
+                    <td><span class="move-uci">b7b6</span></td>
+                    <td>b6</td>
+                    <td><span class="quality-badge quality-blunder">Blunder</span></td>
+                    <td>88</td>
+                    <td>9.82s</td>
+                    <td style="font-size: 0.85em; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">This move advances the pawn to d5, attacking the knight on e6 and gaining space in the center. It al...</td>
+                </tr>
+            
+                <tr>
+                    <td class="move-number">15</td>
+                    <td><strong>WHITE</strong></td>
+                    <td><span class="move-uci">h3h4</span></td>
+                    <td>Qh4</td>
+                    <td><span class="quality-badge quality-blunder">Blunder</span></td>
+                    <td>112</td>
+                    <td>46.20s</td>
+                    <td style="font-size: 0.85em; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">The move Qxf5 is a strong tactical capture that wins a pawn and exploits Black's weakened kingside. ...</td>
+                </tr>
+            
+                <tr>
+                    <td class="move-number">16</td>
+                    <td><strong>BLACK</strong></td>
+                    <td><span class="move-uci">d8c8</span></td>
+                    <td>Qc8</td>
+                    <td><span class="quality-badge quality-catastrophic">Catastrophic</span></td>
+                    <td>360</td>
+                    <td>10.62s</td>
+                    <td style="font-size: 0.85em; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">This move captures the White bishop on e4, gaining material advantage. It also centralizes the knigh...</td>
+                </tr>
+            
+                <tr>
+                    <td class="move-number">17</td>
+                    <td><strong>WHITE</strong></td>
+                    <td><span class="move-uci">g4f5</span></td>
+                    <td>Bf5</td>
+                    <td><span class="quality-badge quality-catastrophic">Catastrophic</span></td>
+                    <td>326</td>
+                    <td>10.17s</td>
+                    <td style="font-size: 0.85em; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">The position is tactically sharp. White's bishop on g4 is pinned to the queen on h4 by Black's knigh...</td>
+                </tr>
+            
+                <tr>
+                    <td class="move-number">18</td>
+                    <td><strong>BLACK</strong></td>
+                    <td><span class="move-uci">e7e8</span></td>
+                    <td>Ke8</td>
+                    <td><span class="quality-badge quality-catastrophic">Catastrophic</span></td>
+                    <td>299</td>
+                    <td>9.69s</td>
+                    <td style="font-size: 0.85em; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">This move captures the knight on h6, gaining material advantage. It also puts pressure on the black ...</td>
+                </tr>
+            
+                <tr>
+                    <td class="move-number">19</td>
+                    <td><strong>WHITE</strong></td>
+                    <td><span class="move-uci">f5h7</span></td>
+                    <td>Bxh7</td>
+                    <td><span class="quality-badge quality-catastrophic">Catastrophic</span></td>
+                    <td>911</td>
+                    <td>11.20s</td>
+                    <td style="font-size: 0.85em; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">The move Fh7+ is a powerful discovered check and a winning tactical shot. The position is highly tac...</td>
+                </tr>
+            
+                <tr>
+                    <td class="move-number">20</td>
+                    <td><strong>BLACK</strong></td>
+                    <td><span class="move-uci">g7g6</span></td>
+                    <td>g6</td>
+                    <td><span class="quality-badge quality-catastrophic">Catastrophic</span></td>
+                    <td>549</td>
+                    <td>2.57s</td>
+                    <td style="font-size: 0.85em; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">This move strengthens the pawn structure and prepares to develop the dark-squared bishop. It also pr...</td>
+                </tr>
+            
+            </tbody>
+        </table>
+        
+                </div>
+            </div>
+        </section>
+        
+        <footer>
+            <p>Generated by Chess Green Agent Evaluation System</p>
+        </footer>
+    </div>
+    
+    <script>
+        
+        // ACPL Trend Chart
+        var acplTrace1 = {
+            x: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+            y: [0, None, 33, None, 233, None, 589, None, 673, None, 1186, None, 1228, None, 1340, None, 1666, None, 2577, None],
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: 'Test DeepSeek',
+            line: {color: '#4a5568', width: 2},
+            marker: {size: 6}
+        };
+        
+        var acplTrace2 = {
+            x: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+            y: [None, 6, None, 6, None, 87, None, 465, None, 1190, None, 1659, None, 1747, None, 2107, None, 2406, None, 2955],
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: 'Test ChatGPT',
+            line: {color: '#cbd5e0', width: 2},
+            marker: {size: 6}
+        };
+        
+        var acplLayout = {
+            title: 'Cumulative Centipawn Loss',
+            xaxis: {title: 'Move Number'},
+            yaxis: {title: 'Cumulative CP Loss'},
+            hovermode: 'closest'
+        };
+        
+        Plotly.newPlot('acpl-chart', [acplTrace1, acplTrace2], acplLayout);
+        
+        // Move Quality Distribution
+        var qualityTrace1 = {
+            x: ['best', 'excellent', 'good', 'inaccuracy', 'mistake', 'blunder', 'catastrophic'],
+            y: [1, 0, 0, 1, 1, 2, 5],
+            type: 'bar',
+            name: 'Test DeepSeek',
+            marker: {color: '#4a5568'}
+        };
+        
+        var qualityTrace2 = {
+            x: ['best', 'excellent', 'good', 'inaccuracy', 'mistake', 'blunder', 'catastrophic'],
+            y: [1, 1, 0, 0, 0, 2, 6],
+            type: 'bar',
+            name: 'Test ChatGPT',
+            marker: {color: '#cbd5e0'}
+        };
+        
+        var qualityLayout = {
+            title: 'Move Quality Distribution',
+            xaxis: {title: 'Quality Category'},
+            yaxis: {title: 'Count'},
+            barmode: 'group'
+        };
+        
+        Plotly.newPlot('quality-chart', [qualityTrace1, qualityTrace2], qualityLayout);
+        
+        // Thinking Time Chart
+        var timeTrace1 = {
+            x: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+            y: [8.875083923339844, None, 9.470921754837036, None, 41.14939069747925, None, 41.81767988204956, None, 10.418440341949463, None, 96.6627950668335, None, 40.00838112831116, None, 46.201534271240234, None, 10.174198150634766, None, 11.203832387924194, None],
+            type: 'scatter',
+            mode: 'markers',
+            name: 'Test DeepSeek',
+            marker: {color: '#4a5568', size: 8}
+        };
+        
+        var timeTrace2 = {
+            x: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+            y: [None, 3.9437386989593506, None, 2.9905288219451904, None, 16.644632816314697, None, 13.971094608306885, None, 12.844706773757935, None, 15.664332628250122, None, 9.815489530563354, None, 10.621077537536621, None, 9.69468069076538, None, 2.572709321975708],
+            type: 'scatter',
+            mode: 'markers',
+            name: 'Test ChatGPT',
+            marker: {color: '#cbd5e0', size: 8}
+        };
+        
+        var timeLayout = {
+            title: 'Thinking Time per Move',
+            xaxis: {title: 'Move Number'},
+            yaxis: {title: 'Time (seconds)'},
+            hovermode: 'closest'
+        };
+        
+        Plotly.newPlot('time-chart', [timeTrace1, timeTrace2], timeLayout);
+        
+    </script>
+</body>
+</html>

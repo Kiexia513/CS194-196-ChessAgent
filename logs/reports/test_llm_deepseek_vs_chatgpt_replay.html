@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Replay - test_llm_deepseek_vs_chatgpt</title>
+    <style>
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a202c;
+            color: #cbd5e0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #2d3748;
+            border-radius: 10px;
+        }
+        
+        header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        
+        .game-info {
+            font-size: 1.1em;
+        }
+        
+        .replay-controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .replay-controls button {
+            padding: 10px 20px;
+            background: #4a5568;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        
+        .replay-controls button:hover:not(:disabled) {
+            background: #667eea;
+        }
+        
+        .replay-controls button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        #move-counter {
+            padding: 10px 20px;
+            background: #2d3748;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        
+        .replay-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .board-section {
+            background: #2d3748;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        
+        .board-display {
+            background: #1a202c;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 450px;
+        }
+        
+        #chess-board-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .chess-square {
+            position: relative;
+            transition: background-color 0.2s;
+        }
+        
+        .chess-piece-white {
+            color: #ffffff;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8), -1px -1px 2px rgba(0,0,0,0.8);
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+        }
+        
+        .chess-piece-black {
+            color: #1a1a1a;
+            text-shadow: 1px 1px 1px rgba(255,255,255,0.3);
+            filter: drop-shadow(0 1px 1px rgba(255,255,255,0.2));
+        }
+        
+        .ascii-board {
+            font-family: 'Courier New', monospace;
+            font-size: 1.2em;
+            line-height: 1.4;
+            color: #cbd5e0;
+            white-space: pre;
+        }
+        
+        .move-info {
+            background: #1a202c;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        
+        .move-info h3 {
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+        
+        .move-info p {
+            margin: 5px 0;
+        }
+        
+        .moves-list {
+            background: #2d3748;
+            padding: 20px;
+            border-radius: 10px;
+            max-height: 800px;
+            overflow-y: auto;
+        }
+        
+        .moves-list h3 {
+            margin-bottom: 15px;
+            color: #667eea;
+        }
+        
+        .move-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: #1a202c;
+            border-radius: 5px;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+        }
+        
+        .move-item:hover {
+            background: #4a5568;
+        }
+        
+        .move-item.active {
+            border-left-color: #667eea;
+            background: #4a5568;
+        }
+        
+        @media (max-width: 768px) {
+            .replay-content {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        
+        .chess-board {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            border: 3px solid #8b4513;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            border-radius: 4px;
+        }
+        
+        .chess-square {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            user-select: none;
+            transition: background-color 0.2s;
+        }
+        
+        .chess-square:hover {
+            opacity: 0.9;
+        }
+        
+        .chess-square.light {
+            background-color: #f0d9b5;
+        }
+        
+        .chess-square.dark {
+            background-color: #b58863;
+        }
+        
+        .chess-square.highlight {
+            background-color: #f6f669 !important;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.3);
+        }
+        
+        .chess-piece {
+            font-size: 2.5em;
+            line-height: 1;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+        
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎮 Game Replay</h1>
+            <div class="game-info">
+                <p><strong>Test DeepSeek</strong> vs <strong>Test ChatGPT</strong></p>
+                <p>Result: *</p>
+            </div>
+        </header>
+        
+        <div class="replay-controls">
+            <button id="prev-btn" onclick="previousMove()">◀ Previous</button>
+            <button id="next-btn" onclick="nextMove()">Next ▶</button>
+            <button id="first-btn" onclick="firstMove()">⏮ First</button>
+            <button id="last-btn" onclick="lastMove()">⏭ Last</button>
+            <span id="move-counter">Move: 0 / 20</span>
+        </div>
+        
+        <div class="replay-content">
+            <div class="board-section">
+                <div id="board-display" class="board-display">
+                    <div id="chess-board-container"></div>
+                </div>
+                <div id="move-info" class="move-info">
+                    <h3>Move Information</h3>
+                    <p id="move-details">Click Next to start replay</p>
+                </div>
+            </div>
+            
+            <div class="moves-list">
+                <h3>All Moves</h3>
+                <div id="moves-container">
+                    
+                <div class="move-item" onclick="currentMoveIndex = 0; updateDisplay();">
+                    <strong>Move 1</strong> - WHITE: e2e4 (e4)
+                    <br><small>Quality: best | CP Loss: 0</small>
+                </div>
+            
+                <div class="move-item" onclick="currentMoveIndex = 1; updateDisplay();">
+                    <strong>Move 2</strong> - BLACK: e7e5 (e5)
+                    <br><small>Quality: excellent | CP Loss: 6</small>
+                </div>
+            
+                <div class="move-item" onclick="currentMoveIndex = 2; updateDisplay();">
+                    <strong>Move 3</strong> - WHITE: d2d4 (d4)
+                    <br><small>Quality: inaccuracy | CP Loss: 33</small>
+                </div>
+            
+                <div class="move-item" onclick="currentMoveIndex = 3; updateDisplay();">
+                    <strong>Move 4</strong> - BLACK: e5d4 (exd4)
+                    <br><small>Quality: best | CP Loss: 0</small>
+                </div>
+            
+                <div class="move-item" onclick="currentMoveIndex = 4; updateDisplay();">
+                    <strong>Move 5</strong> - WHITE: d1g4 (Qg4)
+                    <br><small>Quality: catastrophic | CP Loss: 200</small>
+                </div>
+            
+                <div class="move-item" onclick="currentMoveIndex = 5; updateDisplay();">
+                    <strong>Move 6</strong> - BLACK: d7d6 (d6)
+                    <br><small>Quality: blunder | CP Loss: 81</small>
+                </div>
+            
+                <div class="move-item" onclick="currentMoveIndex = 6; updateDisplay();">
+                    <strong>Move 7</strong> - WHITE: f1b5 (Bb5+)
+                    <br><small>Quality: catastrophic | CP Loss: 356</small>
+                </div>
+            
+                <div class="move-item" onclick="currentMoveIndex = 7; updateDisplay();">
+                    <strong>Move 8</strong> - BLACK: c8d7 (Bd7)
+                    <br><small>Quality: catastrophic | CP Loss: 378</small>
+                </div>
+            
+                <div class="move-item" onclick="currentMoveIndex = 8; updateDisplay();">
+                    <strong>Move 9</strong> - WHITE: b5d7 (Bxd7+)
+                    <br><small>Quality: blunder | CP Loss: 84</small>
+                </div>
+            
+                <div class="move-item" onclick="currentMoveIndex = 9; updateDisplay();">
+                    <strong>Move 10</strong> - BLACK: e8e7 (Ke7)
+                    <br><small>Quality: catastrophic | CP Loss: 725</small>
+                </div>
+            
+                <div class="move-item" onclick="currentMoveIndex = 10; updateDisplay();">
+                    <strong>Move 11</strong> - WHITE: g4h3 (Qh3)
+                    <br><small>Quality: catastrophic | CP Loss: 513</small>
+                </div>
+            
+                <div class="move-item" onclick="currentMoveIndex = 11; updateDisplay();">
+                    <strong>Move 12</strong> - BLACK: g8f6 (Nf6)
+                    <br><small>Quality: catastrophic | CP Loss: 469</small>
+                </div>
+            
+                <div class="move-item" onclick="currentMoveIndex = 12; updateDisplay();">
+                    <strong>Move 13</strong> - WHITE: d7g4 (Bg4)
+                    <br><small>Quality: mistake | CP Loss: 42</small>
+                </div>
+            
+                <div class="move-item" onclick="currentMoveIndex = 13; updateDisplay();">
+                    <strong>Move 14</strong> - BLACK: b7b6 (b6)
+                    <br><small>Quality: blunder | CP Loss: 88</small>
+                </div>
+            
+                <div class="move-item" onclick="currentMoveIndex = 14; updateDisplay();">
+                    <strong>Move 15</strong> - WHITE: h3h4 (Qh4)
+                    <br><small>Quality: blunder | CP Loss: 112</small>
+                </div>
+            
+                <div class="move-item" onclick="currentMoveIndex = 15; updateDisplay();">
+                    <strong>Move 16</strong> - BLACK: d8c8 (Qc8)
+                    <br><small>Quality: catastrophic | CP Loss: 360</small>
+                </div>
+            
+                <div class="move-item" onclick="currentMoveIndex = 16; updateDisplay();">
+                    <strong>Move 17</strong> - WHITE: g4f5 (Bf5)
+                    <br><small>Quality: catastrophic | CP Loss: 326</small>
+                </div>
+            
+                <div class="move-item" onclick="currentMoveIndex = 17; updateDisplay();">
+                    <strong>Move 18</strong> - BLACK: e7e8 (Ke8)
+                    <br><small>Quality: catastrophic | CP Loss: 299</small>
+                </div>
+            
+                <div class="move-item" onclick="currentMoveIndex = 18; updateDisplay();">
+                    <strong>Move 19</strong> - WHITE: f5h7 (Bxh7)
+                    <br><small>Quality: catastrophic | CP Loss: 911</small>
+                </div>
+            
+                <div class="move-item" onclick="currentMoveIndex = 19; updateDisplay();">
+                    <strong>Move 20</strong> - BLACK: g7g6 (g6)
+                    <br><small>Quality: catastrophic | CP Loss: 549</small>
+                </div>
+            
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const boardStates = [{"move_number": 1, "player": "white", "move_uci": "e2e4", "move_san": "e4", "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", "board_ascii": ["a b c d e f g h", "8 r n b q k b n r", "7 p p p p p p p p", "6 . . . . . . . .", "5 . . . . . . . .", "4 . . . . P . . .", "3 . . . . . . . .", "2 P P P P . P P P", "1 R N B Q K B N R"], "move_from": "e2", "move_to": "e4", "quality": "best", "cp_loss": 0, "reasoning": "This is the starting position of a standard chess game. The move e2e4 is one of the strongest and most popular opening moves for White. It immediately stakes a claim in the center by occupying the e4 square with a pawn, controlling the important d5 square. This move opens lines for both the queen and the king's bishop, facilitating rapid piece development. It aligns with fundamental opening principles: control the center, develop pieces, and prepare for king safety through castling. While other moves like d2d4 or g1f3 are also excellent, e2e4 leads to open, tactical positions and is a cornerstone of many aggressive opening systems. There are no immediate tactical threats or material considerations at this stage, so the choice is based on sound strategic principles."}, {"move_number": 2, "player": "black", "move_uci": "e7e5", "move_san": "e5", "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2", "board_ascii": ["a b c d e f g h", "8 r n b q k b n r", "7 p p p p . p p p", "6 . . . . . . . .", "5 . . . . p . . .", "4 . . . . P . . .", "3 . . . . . . . .", "2 P P P P . P P P", "1 R N B Q K B N R"], "move_from": "e7", "move_to": "e5", "quality": "excellent", "cp_loss": 6, "reasoning": "This move advances the pawn to e5, controlling the center and challenging White's pawn on e4. It also opens lines for the development of the knight on g8 and the bishop on f8. By occupying the center, Black aims to establish a strong pawn structure and create opportunities for piece activity. This move adheres to opening principles by fighting for control of the center and preparing for further development."}, {"move_number": 3, "player": "white", "move_uci": "d2d4", "move_san": "d4", "fen": "rnbqkbnr/pppp1ppp/8/4p3/3PP3/8/PPP2PPP/RNBQKBNR b KQkq - 0 2", "board_ascii": ["a b c d e f g h", "8 r n b q k b n r", "7 p p p p . p p p", "6 . . . . . . . .", "5 . . . . p . . .", "4 . . . P P . . .", "3 . . . . . . . .", "2 P P P . . P P P", "1 R N B Q K B N R"], "move_from": "d2", "move_to": "d4", "quality": "inaccuracy", "cp_loss": 33, "reasoning": "The position is the King's Pawn Game after 1.e4 e5. White's best move is to challenge the center immediately with d2d4, directly attacking Black's e5 pawn. This follows classical opening principles by fighting for central control. After d4, if Black captures exd4, White can recapture with the queen (Qxd4), developing a piece with tempo as the queen attacks the knight on b8. This leads to a comfortable position with central dominance and rapid piece development. Alternatives like Nf3 (the Italian Game) or Bc4 (the Bishop's Opening) are also good, but d4 is the most direct and principled move, immediately opening the center and lines for the queen and bishop. It avoids slower or less challenging continuations."}, {"move_number": 4, "player": "black", "move_uci": "e5d4", "move_san": "exd4", "fen": "rnbqkbnr/pppp1ppp/8/8/3pP3/8/PPP2PPP/RNBQKBNR w KQkq - 0 3", "board_ascii": ["a b c d e f g h", "8 r n b q k b n r", "7 p p p p . p p p", "6 . . . . . . . .", "5 . . . . . . . .", "4 . . . p P . . .", "3 . . . . . . . .", "2 P P P . . P P P", "1 R N B Q K B N R"], "move_from": "e5", "move_to": "d4", "quality": "best", "cp_loss": 0, "reasoning": "This move captures the pawn on d4, gaining material and opening lines for further piece activity. It also places pressure on the center, potentially disrupting White's pawn structure and development. By taking on d4, Black not only removes a central pawn but also creates a more dynamic position, allowing for better piece coordination in future moves."}, {"move_number": 5, "player": "white", "move_uci": "d1g4", "move_san": "Qg4", "fen": "rnbqkbnr/pppp1ppp/8/8/3pP1Q1/8/PPP2PPP/RNB1KBNR b KQkq - 1 3", "board_ascii": ["a b c d e f g h", "8 r n b q k b n r", "7 p p p p . p p p", "6 . . . . . . . .", "5 . . . . . . . .", "4 . . . p P . Q .", "3 . . . . . . . .", "2 P P P . . P P P", "1 R N B . K B N R"], "move_from": "d1", "move_to": "g4", "quality": "catastrophic", "cp_loss": 200, "reasoning": "The FEN rnbqkbnr/pppp1ppp/8/8/3pP3/8/PPP2PPP/RNBQKBNR w KQkq - 0 3 indicates it is White's turn. The board shows White has a pawn on e4 and Black has a pawn on d4. The move e4d5 is a capture en passant, which is legal here because Black's previous move was a double-step pawn push to d4 (implied by the FEN's en passant target field being '-', but the position shows the pawn just moved). Capturing en passant immediately wins a pawn, opens the center, and develops an initiative. It also follows opening principles by challenging Black's center and activating White's pieces. No other move offers such a clear material gain while improving position."}, {"move_number": 6, "player": "black", "move_uci": "d7d6", "move_san": "d6", "fen": "rnbqkbnr/ppp2ppp/3p4/8/3pP1Q1/8/PPP2PPP/RNB1KBNR w KQkq - 0 4", "board_ascii": ["a b c d e f g h", "8 r n b q k b n r", "7 p p p . . p p p", "6 . . . p . . . .", "5 . . . . . . . .", "4 . . . p P . Q .", "3 . . . . . . . .", "2 P P P . . P P P", "1 R N B . K B N R"], "move_from": "d7", "move_to": "d6", "quality": "blunder", "cp_loss": 81, "reasoning": "This move advances the queen's pawn to e5, directly attacking the black pawn on d5 and gaining control of the center. It also opens up lines for the queen and potentially the bishop on c1. This move puts pressure on black's position and prepares for further development. Additionally, it maintains the initiative and can lead to tactical opportunities in the next moves."}, {"move_number": 7, "player": "white", "move_uci": "f1b5", "move_san": "Bb5+", "fen": "rnbqkbnr/ppp2ppp/3p4/1B6/3pP1Q1/8/PPP2PPP/RNB1K1NR b KQkq - 1 4", "board_ascii": ["a b c d e f g h", "8 r n b q k b n r", "7 p p p . . p p p", "6 . . . p . . . .", "5 . B . . . . . .", "4 . . . p P . Q .", "3 . . . . . . . .", "2 P P P . . P P P", "1 R N B . K . N R"], "move_from": "f1", "move_to": "b5", "quality": "catastrophic", "cp_loss": 356, "reasoning": "The FEN indicates it is White's turn (w) after Black's third move. The position shows White's queen on g4 and a Black pawn on d4. Capturing the pawn on d4 with the queen (g4xd4) is a legal and strong move. It immediately wins a pawn, removes Black's central pawn, opens the d-file for White's rook, and centralizes the queen. Black cannot recapture with the c-pawn as it is still on c7, and the d6 pawn is pinned by White's queen along the d-file to the Black king on e8. This move also develops White's queen to a more active central square while gaining material. Alternative moves like developing the knight (Ng1-f3) or bishop (Bf1-d3) are solid but less forcing and miss the tactical opportunity to win a pawn cleanly. The move follows opening principles by capturing a central pawn and improving piece activity."}, {"move_number": 8, "player": "black", "move_uci": "c8d7", "move_san": "Bd7", "fen": "rn1qkbnr/pppb1ppp/3p4/1B6/3pP1Q1/8/PPP2PPP/RNB1K1NR w KQkq - 2 5", "board_ascii": ["a b c d e f g h", "8 r n . q k b n r", "7 p p p b . p p p", "6 . . . p . . . .", "5 . B . . . . . .", "4 . . . p P . Q .", "3 . . . . . . . .", "2 P P P . . P P P", "1 R N B . K . N R"], "move_from": "c8", "move_to": "d7", "quality": "catastrophic", "cp_loss": 378, "reasoning": "This move advances the queen's pawn to g5, creating a direct threat against the f6 knight. It also opens up the possibility of attacking the black king's position. The move is aggressive and puts pressure on black's position, forcing a response. Additionally, it maintains control over the center and keeps the initiative."}, {"move_number": 9, "player": "white", "move_uci": "b5d7", "move_san": "Bxd7+", "fen": "rn1qkbnr/pppB1ppp/3p4/8/3pP1Q1/8/PPP2PPP/RNB1K1NR b KQkq - 0 5", "board_ascii": ["a b c d e f g h", "8 r n . q k b n r", "7 p p p B . p p p", "6 . . . p . . . .", "5 . . . . . . . .", "4 . . . p P . Q .", "3 . . . . . . . .", "2 P P P . . P P P", "1 R N B . K . N R"], "move_from": "b5", "move_to": "d7", "quality": "blunder", "cp_loss": 84, "reasoning": "The position is tactically rich. White's bishop on b5 is pinned against the queen on d7, but Black's king is still on e8 and the bishop on c8 is blocking the rook. The immediate tactical shot is Bxd7+, capturing the queen. After Kxd7, White has Qxg7, attacking the rook on h8 and threatening to win material. Black's best response is likely ...Rg8, but then Qxh7, and White is up a pawn with a strong attack. Alternatively, if Black recaptures with the queen, then Bxd7 is still winning a piece. This move exploits the pin on the d7 queen and the exposed position of Black's king, leading to significant material gain or a decisive attack. Other moves like Qxg7 immediately are less accurate due to ...Qxg7 Bxg7 Rg8, where White only wins a pawn and the bishop is trapped. Bxd7+ is the most forcing and advantageous continuation."}, {"move_number": 10, "player": "black", "move_uci": "e8e7", "move_san": "Ke7", "fen": "rn1q1bnr/pppBkppp/3p4/8/3pP1Q1/8/PPP2PPP/RNB1K1NR w KQ - 1 6", "board_ascii": ["a b c d e f g h", "8 r n . q . b n r", "7 p p p B k p p p", "6 . . . p . . . .", "5 . . . . . . . .", "4 . . . p P . Q .", "3 . . . . . . . .", "2 P P P . . P P P", "1 R N B . K . N R"], "move_from": "e8", "move_to": "e7", "quality": "catastrophic", "cp_loss": 725, "reasoning": "This move advances the pawn to d4, attacking the queen on e4 and forcing it to move. It also helps to gain space in the center and restricts the opponent's piece mobility. This move is crucial as it not only threatens the opponent's queen but also maintains a strong pawn presence in the center, which is vital for controlling the game."}, {"move_number": 11, "player": "white", "move_uci": "g4h3", "move_san": "Qh3", "fen": "rn1q1bnr/pppBkppp/3p4/8/3pP3/7Q/PPP2PPP/RNB1K1NR b KQ - 2 6", "board_ascii": ["a b c d e f g h", "8 r n . q . b n r", "7 p p p B k p p p", "6 . . . p . . . .", "5 . . . . . . . .", "4 . . . p P . . .", "3 . . . . . . . Q", "2 P P P . . P P P", "1 R N B . K . N R"], "move_from": "g4", "move_to": "h3", "quality": "catastrophic", "cp_loss": 513, "reasoning": "The FEN shows White to move. The key feature is a white bishop on d7, which is attacking the black king on e8. Black's king is in check. The only legal moves are those that get the king out of check. The bishop cannot be captured as no black piece attacks d7. The king cannot move to d8, e7, or f8 as those squares are attacked or occupied. The only legal move is to promote the bishop to a knight, delivering checkmate. The move d7e8n is a legal underpromotion to knight, delivering checkmate as the black king has no escape squares (d8, e7, f7, f8 are all controlled by white pieces: the queen on g4 covers e6, f5, f4, etc., and the pawn on e4 covers d5 and f5; the knight promotion also attacks f6 and g7). This is a forced checkmate and the best move."}, {"move_number": 12, "player": "black", "move_uci": "g8f6", "move_san": "Nf6", "fen": "rn1q1b1r/pppBkppp/3p1n2/8/3pP3/7Q/PPP2PPP/RNB1K1NR w KQ - 3 7", "board_ascii": ["a b c d e f g h", "8 r n . q . b . r", "7 p p p B k p p p", "6 . . . p . n . .", "5 . . . . . . . .", "4 . . . p P . . .", "3 . . . . . . . Q", "2 P P P . . P P P", "1 R N B . K . N R"], "move_from": "g8", "move_to": "f6", "quality": "catastrophic", "cp_loss": 469, "reasoning": "This move advances the pawn to d4, attacking the queen on h4 and forcing it to move. It also maintains control of the center and prevents White from easily advancing their pawns. The move is aggressive and takes advantage of the current position, while also improving Black's pawn structure."}, {"move_number": 13, "player": "white", "move_uci": "d7g4", "move_san": "Bg4", "fen": "rn1q1b1r/ppp1kppp/3p1n2/8/3pP1B1/7Q/PPP2PPP/RNB1K1NR b KQ - 4 7", "board_ascii": ["a b c d e f g h", "8 r n . q . b . r", "7 p p p . k p p p", "6 . . . p . n . .", "5 . . . . . . . .", "4 . . . p P . B .", "3 . . . . . . . Q", "2 P P P . . P P P", "1 R N B . K . N R"], "move_from": "d7", "move_to": "g4", "quality": "mistake", "cp_loss": 42, "reasoning": "The FEN shows it is White's turn (w). The bishop on d7 is attacking the black king on e8. The black king is in check, and the bishop cannot be captured because it is protected by the queen on h3. The black king has no legal squares to move to (e7 is attacked by the bishop, d8 is attacked by the queen, f8 is occupied by a black knight, and f7 is attacked by the bishop and possibly the queen). The black pieces cannot block the check. Therefore, Bxe8 is a forced checkmate. This is the strongest and only winning move, delivering an immediate victory. The promotion to queen is specified as the bishop is moving to the promotion square e8, though the piece type is irrelevant as it is a capture resulting in checkmate."}, {"move_number": 14, "player": "black", "move_uci": "b7b6", "move_san": "b6", "fen": "rn1q1b1r/p1p1kppp/1p1p1n2/8/3pP1B1/7Q/PPP2PPP/RNB1K1NR w KQ - 0 8", "board_ascii": ["a b c d e f g h", "8 r n . q . b . r", "7 p . p . k p p p", "6 . p . p . n . .", "5 . . . . . . . .", "4 . . . p P . B .", "3 . . . . . . . Q", "2 P P P . . P P P", "1 R N B . K . N R"], "move_from": "b7", "move_to": "b6", "quality": "blunder", "cp_loss": 88, "reasoning": "This move advances the pawn to d5, attacking the knight on e6 and gaining space in the center. It also opens up the position for potential tactical opportunities and maintains pressure on Black's position. The move is legal and strategically sound, as it improves White's control over the center while threatening to capture the knight on the next move."}, {"move_number": 15, "player": "white", "move_uci": "h3h4", "move_san": "Qh4", "fen": "rn1q1b1r/p1p1kppp/1p1p1n2/8/3pP1BQ/8/PPP2PPP/RNB1K1NR b KQ - 1 8", "board_ascii": ["a b c d e f g h", "8 r n . q . b . r", "7 p . p . k p p p", "6 . p . p . n . .", "5 . . . . . . . .", "4 . . . p P . B Q", "3 . . . . . . . .", "2 P P P . . P P P", "1 R N B . K . N R"], "move_from": "h3", "move_to": "h4", "quality": "blunder", "cp_loss": 112, "reasoning": "The move Qxf5 is a strong tactical capture that wins a pawn and exploits Black's weakened kingside. The knight on f5 is undefended, and capturing it with the queen removes a key defender of Black's king while opening the h3-c8 diagonal for the bishop on g4. Black's king is exposed on e7, and after Qxf5, White threatens further attacks along the f-file and the a2-g8 diagonal. The bishop on g4 is also well-placed to support an attack. This move is superior to alternatives like Bxf5, which would trade off a strong attacking piece, or developing moves like Nf3, which miss the immediate tactical opportunity. The position demands active play to capitalize on White's development advantage and Black's king position."}, {"move_number": 16, "player": "black", "move_uci": "d8c8", "move_san": "Qc8", "fen": "rnq2b1r/p1p1kppp/1p1p1n2/8/3pP1BQ/8/PPP2PPP/RNB1K1NR w KQ - 2 9", "board_ascii": ["a b c d e f g h", "8 r n q . . b . r", "7 p . p . k p p p", "6 . p . p . n . .", "5 . . . . . . . .", "4 . . . p P . B Q", "3 . . . . . . . .", "2 P P P . . P P P", "1 R N B . K . N R"], "move_from": "d8", "move_to": "c8", "quality": "catastrophic", "cp_loss": 360, "reasoning": "This move captures the White bishop on e4, gaining material advantage. It also centralizes the knight, increasing its activity and control over the board. Additionally, it puts pressure on the White position and disrupts their pawn structure. The move is tactically sound as it removes a key attacking piece from White's position."}, {"move_number": 17, "player": "white", "move_uci": "g4f5", "move_san": "Bf5", "fen": "rnq2b1r/p1p1kppp/1p1p1n2/5B2/3pP2Q/8/PPP2PPP/RNB1K1NR b KQ - 3 9", "board_ascii": ["a b c d e f g h", "8 r n q . . b . r", "7 p . p . k p p p", "6 . p . p . n . .", "5 . . . . . B . .", "4 . . . p P . . Q", "3 . . . . . . . .", "2 P P P . . P P P", "1 R N B . K . N R"], "move_from": "g4", "move_to": "f5", "quality": "catastrophic", "cp_loss": 326, "reasoning": "The position is tactically sharp. White's bishop on g4 is pinned to the queen on h4 by Black's knight on f6. However, Black's king on e7 is exposed. The move g4f5 attacks the pinned knight on f6 with the bishop. If Black captures the bishop with the g7 pawn (gxf5), then Qxf6+ wins the knight with check, forking the king and rook on h8, leading to a significant material gain. If Black instead moves the knight (e.g., Nxh5), then Bxh5 leaves White with a strong attack and a material advantage of a bishop for a pawn. Other moves like Qxf6+ immediately are less effective due to Kxf6. The move also maintains pressure and opens the g-file for the rook after potential exchanges. It is the most forcing and advantageous continuation."}, {"move_number": 18, "player": "black", "move_uci": "e7e8", "move_san": "Ke8", "fen": "rnq1kb1r/p1p2ppp/1p1p1n2/5B2/3pP2Q/8/PPP2PPP/RNB1K1NR w KQ - 4 10", "board_ascii": ["a b c d e f g h", "8 r n q . k b . r", "7 p . p . . p p p", "6 . p . p . n . .", "5 . . . . . B . .", "4 . . . p P . . Q", "3 . . . . . . . .", "2 P P P . . P P P", "1 R N B . K . N R"], "move_from": "e7", "move_to": "e8", "quality": "catastrophic", "cp_loss": 299, "reasoning": "This move captures the knight on h6, gaining material advantage. It also puts pressure on the black king by threatening to further attack the pawn structure around it. The move is legal and takes advantage of the opponent's exposed piece, improving my position significantly."}, {"move_number": 19, "player": "white", "move_uci": "f5h7", "move_san": "Bxh7", "fen": "rnq1kb1r/p1p2ppB/1p1p1n2/8/3pP2Q/8/PPP2PPP/RNB1K1NR b KQ - 0 10", "board_ascii": ["a b c d e f g h", "8 r n q . k b . r", "7 p . p . . p p B", "6 . p . p . n . .", "5 . . . . . . . .", "4 . . . p P . . Q", "3 . . . . . . . .", "2 P P P . . P P P", "1 R N B . K . N R"], "move_from": "f5", "move_to": "h7", "quality": "catastrophic", "cp_loss": 911, "reasoning": "The move Fh7+ is a powerful discovered check and a winning tactical shot. The position is highly tactical. White's bishop on f5 is pinned against Black's king, which is still on e8. The key observation is that moving the bishop reveals a check from the queen on h4. The immediate threat is Bxh7+, forcing the king to move (likely to f8, as g8 is covered by the queen). After Kf8, White can follow up with Qh8+, forcing Ke7, and then Qxg7+, winning the rook on h8 and maintaining a decisive attack. Black's knight on f6 is pinned to the queen (d8) by White's bishop, so it cannot capture on h7. Black's pawn structure is compromised, and their king is exposed in the center. This move immediately exploits the lack of king safety and coordination in Black's position, leading to significant material gain or checkmate. Alternatives like Qxd4+ are less forceful, allowing Black to develop or block. The discovered check is the most forcing and best continuation."}, {"move_number": 20, "player": "black", "move_uci": "g7g6", "move_san": "g6", "fen": "rnq1kb1r/p1p2p1B/1p1p1np1/8/3pP2Q/8/PPP2PPP/RNB1K1NR w KQ - 0 11", "board_ascii": ["a b c d e f g h", "8 r n q . k b . r", "7 p . p . . p . B", "6 . p . p . n p .", "5 . . . . . . . .", "4 . . . p P . . Q", "3 . . . . . . . .", "2 P P P . . P P P", "1 R N B . K . N R"], "move_from": "g7", "move_to": "g6", "quality": "catastrophic", "cp_loss": 549, "reasoning": "This move strengthens the pawn structure and prepares to develop the dark-squared bishop. It also prevents potential threats from the white queen on h5 and allows for better coordination of the pieces. The pawn on g6 will help control the f5 square and provide a safe haven for the king in future moves. Overall, this move enhances the position while maintaining king safety and preparing for future development."}];
+        let currentMoveIndex = 0;
+        
+        function updateDisplay() {
+            if (boardStates.length === 0) {
+                document.getElementById('chess-board-container').innerHTML = '<p>No game data</p>';
+                return;
+            }
+            
+            const state = boardStates[currentMoveIndex];
+            if (!state) {
+                document.getElementById('chess-board-container').innerHTML = '<p>Invalid move index</p>';
+                return;
+            }
+            
+            // Render chess board using HTML/CSS
+            if (state.fen) {
+                const boardHtml = renderChessBoard(state.fen, state.move_from, state.move_to);
+                document.getElementById('chess-board-container').innerHTML = boardHtml;
+            } else {
+                document.getElementById('chess-board-container').innerHTML = '<p>No board data</p>';
+            }
+            
+            // Update move information
+            const moveDetails = `
+                <p><strong>Move ${currentMoveIndex + 1}</strong></p>
+                <p><strong>Player:</strong> ${state.player ? state.player.toUpperCase() : 'N/A'}</p>
+                <p><strong>Move:</strong> ${state.move_uci || 'N/A'} (${state.move_san || 'N/A'})</p>
+                <p><strong>Quality:</strong> ${state.quality || 'N/A'}</p>
+                <p><strong>CP Loss:</strong> ${state.cp_loss !== null && state.cp_loss !== undefined ? state.cp_loss : 'N/A'}</p>
+                <p><strong>Reasoning:</strong> ${state.reasoning || 'N/A'}</p>
+            `;
+            document.getElementById('move-info').innerHTML = '<h3>Move Information</h3>' + moveDetails;
+            
+            // Update move counter
+            document.getElementById('move-counter').textContent = `Move: ${currentMoveIndex + 1} / ${boardStates.length}`;
+            
+            // Update button states
+            document.getElementById('prev-btn').disabled = currentMoveIndex === 0;
+            document.getElementById('next-btn').disabled = currentMoveIndex === boardStates.length - 1;
+            document.getElementById('first-btn').disabled = currentMoveIndex === 0;
+            document.getElementById('last-btn').disabled = currentMoveIndex === boardStates.length - 1;
+            
+            // Highlight current move in list
+            const moveItems = document.querySelectorAll('.move-item');
+            moveItems.forEach((item, idx) => {
+                item.classList.toggle('active', idx === currentMoveIndex);
+            });
+        }
+        
+        function nextMove() {
+            if (currentMoveIndex < boardStates.length - 1) {
+                currentMoveIndex++;
+                updateDisplay();
+            }
+        }
+        
+        function previousMove() {
+            if (currentMoveIndex > 0) {
+                currentMoveIndex--;
+                updateDisplay();
+            }
+        }
+        
+        function firstMove() {
+            currentMoveIndex = 0;
+            updateDisplay();
+        }
+        
+        function lastMove() {
+            currentMoveIndex = boardStates.length - 1;
+            updateDisplay();
+        }
+        
+        // Unicode chess pieces
+        const PIECES = {
+            'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘', 'P': '♙',
+            'k': '♚', 'q': '♛', 'r': '♜', 'b': '♝', 'n': '♞', 'p': '♟'
+        };
+        
+        function parseFEN(fen) {
+            const parts = fen.split(' ');
+            const boardPart = parts[0];
+            const rows = boardPart.split('/');
+            const board = [];
+            
+            for (let row of rows) {
+                const boardRow = [];
+                for (let char of row) {
+                    if (char >= '1' && char <= '8') {
+                        for (let i = 0; i < parseInt(char); i++) {
+                            boardRow.push(null);
+                        }
+                    } else {
+                        boardRow.push(char);
+                    }
+                }
+                board.push(boardRow);
+            }
+            
+            return board;
+        }
+        
+        function renderChessBoard(fen, highlightFrom, highlightTo) {
+            const board = parseFEN(fen);
+            const size = 400;
+            const squareSize = size / 8;
+            
+            // Darker, more muted board colors
+            const lightSquare = '#d4c4a0';
+            const darkSquare = '#8b6f47';
+            const highlightLight = '#f6f669';
+            const highlightDark = '#cdd26a';
+            
+            let html = `<div class="chess-board" style="width: ${size}px; height: ${size}px; display: grid; grid-template-columns: repeat(8, 1fr); border: 3px solid #6b4e2d; box-shadow: 0 4px 8px rgba(0,0,0,0.5); border-radius: 4px;">`;
+            
+            for (let rank = 0; rank < 8; rank++) {
+                for (let file = 0; file < 8; file++) {
+                    const isLight = (rank + file) % 2 === 0;
+                    const squareName = String.fromCharCode(97 + file) + (8 - rank);
+                    const piece = board[rank][file];
+                    
+                    let bgColor = isLight ? lightSquare : darkSquare;
+                    let highlight = false;
+                    
+                    if (highlightFrom && squareName === highlightFrom) {
+                        bgColor = isLight ? highlightLight : highlightDark;
+                        highlight = true;
+                    }
+                    if (highlightTo && squareName === highlightTo) {
+                        bgColor = isLight ? highlightLight : highlightDark;
+                        highlight = true;
+                    }
+                    
+                    const pieceChar = piece ? (PIECES[piece] || '') : '';
+                    // Determine if piece is white (uppercase) or black (lowercase)
+                    const isWhitePiece = piece && piece === piece.toUpperCase();
+                    const pieceClass = piece ? (isWhitePiece ? 'chess-piece-white' : 'chess-piece-black') : '';
+                    
+                    html += `<div class="chess-square" style="
+                        width: ${squareSize}px; 
+                        height: ${squareSize}px; 
+                        background-color: ${bgColor}; 
+                        display: flex; 
+                        align-items: center; 
+                        justify-content: center; 
+                        font-size: ${squareSize * 0.7}px; 
+                        border: 1px solid rgba(0,0,0,0.15);
+                        ${highlight ? 'box-shadow: inset 0 0 10px rgba(0,0,0,0.4);' : ''}
+                        ">`;
+                    if (pieceChar) {
+                        html += `<span class="${pieceClass}" style="font-weight: bold; line-height: 1;">${pieceChar}</span>`;
+                    }
+                    html += `</div>`;
+                }
+            }
+            
+            html += '</div>';
+            return html;
+        }
+        
+        // Initialize
+        updateDisplay();
+    </script>
+</body>
+</html>
