@@ -1,0 +1,11 @@
+.git
+.gitignore
+.venv
+.ab
+__pycache__
+*.pyc
+logs
+reports
+charts
+reference
+

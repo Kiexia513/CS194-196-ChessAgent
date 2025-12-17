@@ -2,7 +2,9 @@
 
 # configuration constants for the Chess Green Agent
 
+import os
 import platform
+import shutil
 from pathlib import Path
 
 # ==================== Stockfish Configuration ====================
@@ -79,9 +81,56 @@ ACPL_ELO_DATA_POINTS = [
 
 # ==================== Helper Functions ====================
 
-def get_stockfish_path() -> str:
-    if Path(STOCKFISH_PATH).exists():
-        return STOCKFISH_PATH
+def get_stockfish_path() -> str | None:
+    """
+    Best-effort Stockfish discovery.
+
+    Priority:
+    1) `STOCKFISH_PATH` or `STOCKFISH_BINARY` env var
+    2) Project-local `engines/` directory
+    3) `stockfish` on PATH
+    4) Fallback to `STOCKFISH_PATH` constant (if it exists)
+    """
+
+    candidates: list[str] = []
+
+    env_path = os.getenv("STOCKFISH_PATH") or os.getenv("STOCKFISH_BINARY")
+    if env_path:
+        candidates.append(env_path)
+
+    # Look for a bundled Stockfish binary in the repo (recommended for local dev).
+    repo_root = Path(__file__).resolve().parents[2]
+    engines_dir = repo_root / "engines"
+    if engines_dir.exists():
+        # Common filenames / layouts
+        common_names = [
+            "stockfish",
+            "stockfish.exe",
+            "stockfish-windows-x86-64-avx2.exe",
+            "stockfish-windows-x86-64.exe",
+        ]
+        for name in common_names:
+            candidates.append(str(engines_dir / name))
+
+        # Any stockfish* executable in engines/
+        for path in sorted(engines_dir.rglob("stockfish*")):
+            if path.is_file() and path.suffix.lower() in {".exe", ""}:
+                candidates.append(str(path))
+
+    which_path = shutil.which("stockfish") or shutil.which("stockfish.exe")
+    if which_path:
+        candidates.append(which_path)
+
+    candidates.append(STOCKFISH_PATH)
+
+    for candidate in candidates:
+        if not candidate:
+            continue
+        p = Path(candidate)
+        if p.exists() and p.is_file():
+            return str(p)
+
+    return None
 
 def interpolate_elo_from_acpl(acpl: float) -> int:
     # use linear interpolation to calculate accurate ELO rating from ACPL
@@ -188,4 +237,3 @@ __all__ = [
     "get_detailed_skill_assessment",
     "print_stockfish_instructions"
 ]
-

@@ -140,6 +140,31 @@ class GameMetrics:
     def to_dict(self) -> Dict[str, Any]:
         # convert to dictionary format
 
+        def _derived_counts(move_quality: Dict[str, int]) -> Dict[str, Any]:
+            best = move_quality.get(SingleMovequalityCategory.BEST.value, 0)
+            excellent = move_quality.get(SingleMovequalityCategory.EXCELLENT.value, 0)
+            good = move_quality.get(SingleMovequalityCategory.GOOD.value, 0)
+            inaccuracy = move_quality.get(SingleMovequalityCategory.INACCURACY.value, 0)
+            mistake = move_quality.get(SingleMovequalityCategory.MISTAKE.value, 0)
+            blunder = move_quality.get(SingleMovequalityCategory.BLUNDER.value, 0)
+            catastrophic = move_quality.get(SingleMovequalityCategory.CATASTROPHIC.value, 0)
+            no_eval = move_quality.get(SingleMovequalityCategory.NO_EVALUATION.value, 0)
+
+            evaluated_moves = max(0, sum(move_quality.values()) - no_eval)
+            best_rate = (best / evaluated_moves) if evaluated_moves else 0.0
+
+            return {
+                "best_moves": best,
+                # Many UIs treat Excellent+Good as "good moves"
+                "good_moves": excellent + good,
+                "inaccuracies": inaccuracy,
+                "mistakes": mistake,
+                # Treat catastrophic blunders as blunders for summary display
+                "blunders": blunder + catastrophic,
+                "evaluated_moves": evaluated_moves,
+                "best_move_rate": round(best_rate, 3),
+            }
+
         # calculate ELO estimation
         white_elo = interpolate_elo_from_acpl(self.white_acpl)
         black_elo = interpolate_elo_from_acpl(self.black_acpl)
@@ -160,7 +185,8 @@ class GameMetrics:
                     "mistakes": self.white_mistakes,
                     "tactical_moves": self.white_tactical_moves,
                     "total_time": round(self.white_total_time, 2),
-                    "move_quality": self.white_move_quality
+                    **_derived_counts(self.white_move_quality),
+                    "move_quality": self.white_move_quality,
                 },
                 "black": {
                     "acpl": round(self.black_acpl, 2),
@@ -170,7 +196,8 @@ class GameMetrics:
                     "mistakes": self.black_mistakes,
                     "tactical_moves": self.black_tactical_moves,
                     "total_time": round(self.black_total_time, 2),
-                    "move_quality": self.black_move_quality
+                    **_derived_counts(self.black_move_quality),
+                    "move_quality": self.black_move_quality,
                 }
             }
         }
@@ -200,7 +227,7 @@ class MetricsCollector:
         # update the move quality statistics
         if move_quality.player == "white":
             self.metrics.white_move_quality[move_quality.category.value] += 1
-            if move_quality.category == SingleMovequalityCategory.BLUNDER:
+            if move_quality.category in (SingleMovequalityCategory.BLUNDER, SingleMovequalityCategory.CATASTROPHIC):
                 self.metrics.white_blunders += 1
             elif move_quality.category == SingleMovequalityCategory.MISTAKE:
                 self.metrics.white_mistakes += 1
@@ -209,7 +236,7 @@ class MetricsCollector:
             self.metrics.white_total_time += move_quality.thinking_time
         else:
             self.metrics.black_move_quality[move_quality.category.value] += 1
-            if move_quality.category == SingleMovequalityCategory.BLUNDER:
+            if move_quality.category in (SingleMovequalityCategory.BLUNDER, SingleMovequalityCategory.CATASTROPHIC):
                 self.metrics.black_blunders += 1
             elif move_quality.category == SingleMovequalityCategory.MISTAKE:
                 self.metrics.black_mistakes += 1
@@ -338,4 +365,3 @@ Total Moves: {len(self.metrics.move_evaluations)}
    Tactical Moves: {self.metrics.black_tactical_moves:2d}  |  Time: {self.metrics.black_total_time:6.1f}s
 """
         return summary
-

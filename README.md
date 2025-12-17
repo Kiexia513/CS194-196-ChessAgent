@@ -44,7 +44,12 @@ Stockfish is used for objective move quality evaluation and ACPL (Average Centip
 
 **Download**: https://stockfishchess.org/download/
 
-Extract and place in `engines/` directory or add to system PATH.
+Extract and place in `engines/` directory or add to system `PATH`.
+
+This repo will auto-detect Stockfish in the following order:
+1. `STOCKFISH_PATH` / `STOCKFISH_BINARY` environment variable
+2. A local binary under `engines/`
+3. `stockfish` on `PATH`
 
 ### 3. Configure API Keys
 
@@ -73,6 +78,9 @@ python tests/test_complete_system.py
 
 # Full LLM vs LLM game
 python tests/test_llm_agents.py full
+
+# Manual validation: run 3 example test cases and print evaluation summaries
+python tests/validation_examples.py
 ```
 
 ## 🏗️ Project Structure
@@ -396,4 +404,3 @@ This is a course project for Berkeley CS194. Contributions and suggestions are w
 Apache License 2.0
 
 ---
-

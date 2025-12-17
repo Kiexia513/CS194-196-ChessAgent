@@ -1,0 +1,2 @@
+# Ensure shell scripts use LF so Linux shebang works in containers
+run.sh text eol=lf
