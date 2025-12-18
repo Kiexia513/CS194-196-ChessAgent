@@ -1,0 +1,38 @@
+======================================================================
+AGENT COMPARISON REPORT
+======================================================================
+
+SUMMARY
+----------------------------------------
+Agents Compared: 5
+Best Overall: White Agent (CoT)
+Best Accuracy: LLM Baseline (DeepSeek)
+Fastest: White Agent (No CoT)
+
+ACCURACY RANKING
+----------------------------------------
+  1. LLM Baseline (DeepSeek): 40.0%
+  2. White Agent (CoT): 40.0%
+  3. White Agent (No CoT): 20.0%
+  4. Random Baseline: 10.0%
+  5. Greedy Baseline: 0.0%
+
+SPEED RANKING (avg time per move)
+----------------------------------------
+  1. White Agent (No CoT): 0.00s
+  2. Greedy Baseline: 0.10s
+  3. Random Baseline: 0.10s
+  4. White Agent (CoT): 3.79s
+  5. LLM Baseline (DeepSeek): 11.57s
+
+DETAILED COMPARISON
+----------------------------------------
+Agent                     Accuracy     Good/Total   Avg Time   Confidence
+-------------------------------------------------------------------------
+Random Baseline             10.0%     1/10         0.10s      0.45
+Greedy Baseline              0.0%     0/10         0.10s      0.67
+LLM Baseline (DeepSeek)     40.0%     4/10        11.57s      0.92
+White Agent (CoT)           40.0%     4/10         3.79s      0.94
+White Agent (No CoT)        20.0%     2/10         0.00s      0.95
+
+======================================================================

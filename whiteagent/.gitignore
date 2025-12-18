@@ -40,9 +40,6 @@ Thumbs.db
 
 # Logs
 *.log
-logs/
-reports/
-charts/
 
 # Environment variables
 .env
@@ -60,17 +57,4 @@ htmlcov/
 *.tmp
 tmp/
 temp/
-
-# Secrets / API keys
-src/api/api.txt
-.env
-**/src/api/api.txt
-
-# Local engines (e.g., Stockfish binaries)
-engines/
-
-# AgentBeats local artifacts
-.ab/
-
-
 

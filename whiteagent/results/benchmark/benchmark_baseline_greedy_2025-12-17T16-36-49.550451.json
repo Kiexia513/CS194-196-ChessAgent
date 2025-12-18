@@ -1,0 +1,164 @@
+{
+  "agent_id": "baseline_greedy",
+  "agent_name": "Greedy Baseline",
+  "timestamp": "2025-12-17T16:36:49.550451",
+  "summary": {
+    "total_positions": 10,
+    "good_moves": 0,
+    "best_moves": 0,
+    "accuracy": 0.0,
+    "avg_thinking_time": 0.101,
+    "avg_confidence": 0.67
+  },
+  "by_category": {
+    "opening": {
+      "total": 3,
+      "good": 0,
+      "accuracy": 0.0,
+      "avg_time": 0.10106515884399414
+    },
+    "tactical": {
+      "total": 2,
+      "good": 0,
+      "accuracy": 0.0,
+      "avg_time": 0.10080194473266602
+    },
+    "endgame": {
+      "total": 2,
+      "good": 0,
+      "accuracy": 0.0,
+      "avg_time": 0.1012876033782959
+    },
+    "defensive": {
+      "total": 1,
+      "good": 0,
+      "accuracy": 0.0,
+      "avg_time": 0.10149550437927246
+    },
+    "complex": {
+      "total": 2,
+      "good": 0,
+      "accuracy": 0.0,
+      "avg_time": 0.10084903240203857
+    }
+  },
+  "by_difficulty": {
+    "easy": {
+      "total": 5,
+      "good": 0,
+      "accuracy": 0.0
+    },
+    "medium": {
+      "total": 3,
+      "good": 0,
+      "accuracy": 0.0
+    },
+    "hard": {
+      "total": 2,
+      "good": 0,
+      "accuracy": 0.0
+    }
+  },
+  "detailed_results": [
+    {
+      "position_id": "opening_001",
+      "position_name": "Starting Position",
+      "category": "opening",
+      "difficulty": "easy",
+      "agent_move": "d2d3",
+      "is_good_move": false,
+      "confidence": 0.5,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "opening_002",
+      "position_name": "Italian Game Start",
+      "category": "opening",
+      "difficulty": "easy",
+      "agent_move": "g8h6",
+      "is_good_move": false,
+      "confidence": 0.5,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "opening_003",
+      "position_name": "Sicilian Defense",
+      "category": "opening",
+      "difficulty": "easy",
+      "agent_move": "d1f3",
+      "is_good_move": false,
+      "confidence": 0.5,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "tactical_001",
+      "position_name": "Knight Fork",
+      "category": "tactical",
+      "difficulty": "medium",
+      "agent_move": "f3e5",
+      "is_good_move": false,
+      "confidence": 0.8,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "tactical_002",
+      "position_name": "Pin Opportunity",
+      "category": "tactical",
+      "difficulty": "medium",
+      "agent_move": "f3e5",
+      "is_good_move": false,
+      "confidence": 0.8,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "endgame_001",
+      "position_name": "King and Pawn Endgame",
+      "category": "endgame",
+      "difficulty": "medium",
+      "agent_move": "e4e5",
+      "is_good_move": false,
+      "confidence": 0.5,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "endgame_002",
+      "position_name": "Queen checkmate",
+      "category": "endgame",
+      "difficulty": "easy",
+      "agent_move": "a6c6",
+      "is_good_move": false,
+      "confidence": 0.7,
+      "thinking_time": 0.102
+    },
+    {
+      "position_id": "defensive_001",
+      "position_name": "King Safety",
+      "category": "defensive",
+      "difficulty": "easy",
+      "agent_move": "c4f7",
+      "is_good_move": false,
+      "confidence": 0.8,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "complex_001",
+      "position_name": "Middlegame Complexity",
+      "category": "complex",
+      "difficulty": "hard",
+      "agent_move": "g5f6",
+      "is_good_move": false,
+      "confidence": 0.8,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "complex_002",
+      "position_name": "Strategic Decision",
+      "category": "complex",
+      "difficulty": "hard",
+      "agent_move": "d4c6",
+      "is_good_move": false,
+      "confidence": 0.8,
+      "thinking_time": 0.101
+    }
+  ]
+}

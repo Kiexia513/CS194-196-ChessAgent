@@ -1,0 +1,135 @@
+{
+    "opening_positions": [
+        {
+            "id": "opening_001",
+            "name": "Starting Position",
+            "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            "description": "Initial chess position - test standard opening knowledge",
+            "expected_good_moves": [
+                "e2e4",
+                "d2d4",
+                "g1f3",
+                "c2c4"
+            ],
+            "category": "opening",
+            "difficulty": "easy"
+        },
+        {
+            "id": "opening_002",
+            "name": "Italian Game Start",
+            "fen": "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3",
+            "description": "Italian Game position - black to respond",
+            "expected_good_moves": [
+                "f8c5"
+            ],
+            "category": "opening",
+            "difficulty": "easy"
+        },
+        {
+            "id": "opening_003",
+            "name": "Sicilian Defense",
+            "fen": "rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 2",
+            "description": "Sicilian Defense - white's second move",
+            "expected_good_moves": [
+                "g1f3",
+                "b1c3",
+                "c2c3",
+                "d2d4"
+            ],
+            "category": "opening",
+            "difficulty": "easy"
+        }
+    ],
+    "tactical_positions": [
+        {
+            "id": "tactical_001",
+            "name": "Knight Fork",
+            "fen": "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQ1RK1 w kq - 4 5",
+            "description": "Classic knight fork - Ng5 attacks f7 and threatens Nxf7 forking king and rook",
+            "expected_good_moves": [
+                "f3g5"
+            ],
+            "category": "tactical",
+            "difficulty": "medium"
+        },
+        {
+            "id": "tactical_002",
+            "name": "Pin Opportunity",
+            "fen": "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQ1RK1 w kq - 6 6",
+            "description": "White has multiple tactical ideas",
+            "expected_good_moves": [
+                "c2c3",
+                "d2d3",
+                "b1c3"
+            ],
+            "category": "tactical",
+            "difficulty": "medium"
+        }
+    ],
+    "endgame_positions": [
+        {
+            "id": "endgame_001",
+            "name": "King and Pawn Endgame",
+            "fen": "8/4k3/8/8/4PK2/8/8/8 w - - 0 1",
+            "description": "Basic king and pawn endgame - can white win?",
+            "expected_good_moves": [
+                "f4e5"
+            ],
+            "category": "endgame",
+            "difficulty": "medium"
+        },
+        {
+            "id": "endgame_002",
+            "name": "Queen checkmate",
+            "fen": "4k3/8/Q3K3/8/8/8/8/8 w - - 0 1",
+            "description": "Queen checkmate in endgame",
+            "expected_good_moves": [
+                "a6a8",
+                "a6c8"
+            ],
+            "category": "endgame",
+            "difficulty": "easy"
+        }
+    ],
+    "defensive_positions": [
+        {
+            "id": "defensive_001",
+            "name": "King Safety",
+            "fen": "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/3P1N2/PPP2PPP/RNBQK2R w KQkq - 0 5",
+            "description": "White should castle for safety",
+            "expected_good_moves": [
+                "e1g1",
+                "b1c3"
+            ],
+            "category": "defensive",
+            "difficulty": "easy"
+        }
+    ],
+    "complex_positions": [
+        {
+            "id": "complex_001",
+            "name": "Middlegame Complexity",
+            "fen": "r2q1rk1/ppp2ppp/2np1n2/2b1p1B1/2B1P1b1/2NP1N2/PPP2PPP/R2Q1RK1 w - - 4 9",
+            "description": "Complex middlegame with multiple plans",
+            "expected_good_moves": [
+                "h2h3",
+                "c3d5"
+            ],
+            "category": "complex",
+            "difficulty": "hard"
+        },
+        {
+            "id": "complex_002",
+            "name": "Strategic Decision",
+            "fen": "r1bq1rk1/pp2ppbp/2np1np1/8/3NP3/2N1BP2/PPPQ2PP/R3KB1R w KQ - 1 9",
+            "description": "Choose between kingside and queenside play",
+            "expected_good_moves": [
+                "e1c1",
+                "f1e2",
+                "h2h4"
+            ],
+            "category": "complex",
+            "difficulty": "hard"
+        }
+    ]
+}

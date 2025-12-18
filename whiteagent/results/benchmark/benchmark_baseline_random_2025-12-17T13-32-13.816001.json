@@ -1,0 +1,194 @@
+{
+  "agent_id": "baseline_random",
+  "agent_name": "Random Baseline",
+  "timestamp": "2025-12-17T13:32:13.816001",
+  "summary": {
+    "total_positions": 13,
+    "good_moves": 3,
+    "best_moves": 0,
+    "accuracy": 0.2308,
+    "avg_thinking_time": 0.102,
+    "avg_confidence": 0.493
+  },
+  "by_category": {
+    "opening": {
+      "total": 3,
+      "good": 2,
+      "accuracy": 0.6666666666666666,
+      "avg_time": 0.10080591837565105
+    },
+    "tactical": {
+      "total": 3,
+      "good": 0,
+      "accuracy": 0.0,
+      "avg_time": 0.10125239690144856
+    },
+    "endgame": {
+      "total": 3,
+      "good": 1,
+      "accuracy": 0.3333333333333333,
+      "avg_time": 0.10298720995585124
+    },
+    "defensive": {
+      "total": 2,
+      "good": 0,
+      "accuracy": 0.0,
+      "avg_time": 0.10139906406402588
+    },
+    "complex": {
+      "total": 2,
+      "good": 0,
+      "accuracy": 0.0,
+      "avg_time": 0.100960373878479
+    }
+  },
+  "by_difficulty": {
+    "easy": {
+      "total": 6,
+      "good": 2,
+      "accuracy": 0.3333333333333333
+    },
+    "medium": {
+      "total": 4,
+      "good": 1,
+      "accuracy": 0.25
+    },
+    "hard": {
+      "total": 3,
+      "good": 0,
+      "accuracy": 0.0
+    }
+  },
+  "detailed_results": [
+    {
+      "position_id": "opening_001",
+      "position_name": "Starting Position",
+      "category": "opening",
+      "difficulty": "easy",
+      "agent_move": "a2a3",
+      "is_good_move": false,
+      "confidence": 0.675352179349688,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "opening_002",
+      "position_name": "Italian Game Start",
+      "category": "opening",
+      "difficulty": "easy",
+      "agent_move": "d7d6",
+      "is_good_move": true,
+      "confidence": 0.5642213527043451,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "opening_003",
+      "position_name": "Sicilian Defense",
+      "category": "opening",
+      "difficulty": "easy",
+      "agent_move": "b1c3",
+      "is_good_move": true,
+      "confidence": 0.3859223920853731,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "tactical_001",
+      "position_name": "Knight Fork",
+      "category": "tactical",
+      "difficulty": "medium",
+      "agent_move": "g2g4",
+      "is_good_move": false,
+      "confidence": 0.5441272878878057,
+      "thinking_time": 0.102
+    },
+    {
+      "position_id": "tactical_002",
+      "position_name": "Pin Opportunity",
+      "category": "tactical",
+      "difficulty": "medium",
+      "agent_move": "h2h4",
+      "is_good_move": false,
+      "confidence": 0.4388249560638072,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "tactical_003",
+      "position_name": "Discovered Attack Setup",
+      "category": "tactical",
+      "difficulty": "hard",
+      "agent_move": "b1d2",
+      "is_good_move": false,
+      "confidence": 0.3159755778461023,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "endgame_001",
+      "position_name": "King and Pawn Endgame",
+      "category": "endgame",
+      "difficulty": "medium",
+      "agent_move": "f4g4",
+      "is_good_move": false,
+      "confidence": 0.4641832853687815,
+      "thinking_time": 0.107
+    },
+    {
+      "position_id": "endgame_002",
+      "position_name": "Rook Endgame",
+      "category": "endgame",
+      "difficulty": "medium",
+      "agent_move": "g2f1",
+      "is_good_move": true,
+      "confidence": 0.5136489164380638,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "endgame_003",
+      "position_name": "Queen vs Rook",
+      "category": "endgame",
+      "difficulty": "easy",
+      "agent_move": "f2e1",
+      "is_good_move": false,
+      "confidence": 0.3623640174687054,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "defensive_001",
+      "position_name": "Under Attack",
+      "category": "defensive",
+      "difficulty": "easy",
+      "agent_move": "f1d3",
+      "is_good_move": false,
+      "confidence": 0.49998004402953544,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "defensive_002",
+      "position_name": "King Safety",
+      "category": "defensive",
+      "difficulty": "easy",
+      "agent_move": "c1f4",
+      "is_good_move": false,
+      "confidence": 0.6468899046454564,
+      "thinking_time": 0.102
+    },
+    {
+      "position_id": "complex_001",
+      "position_name": "Middlegame Complexity",
+      "category": "complex",
+      "difficulty": "hard",
+      "agent_move": "a1b1",
+      "is_good_move": false,
+      "confidence": 0.49434119451895686,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "complex_002",
+      "position_name": "Strategic Decision",
+      "category": "complex",
+      "difficulty": "hard",
+      "agent_move": "f1a6",
+      "is_good_move": false,
+      "confidence": 0.49688580623861595,
+      "thinking_time": 0.101
+    }
+  ]
+}

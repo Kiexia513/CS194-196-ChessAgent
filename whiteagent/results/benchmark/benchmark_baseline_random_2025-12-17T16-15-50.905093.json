@@ -1,0 +1,164 @@
+{
+  "agent_id": "baseline_random",
+  "agent_name": "Random Baseline",
+  "timestamp": "2025-12-17T16:15:50.905093",
+  "summary": {
+    "total_positions": 10,
+    "good_moves": 1,
+    "best_moves": 1,
+    "accuracy": 0.1,
+    "avg_thinking_time": 0.101,
+    "avg_confidence": 0.448
+  },
+  "by_category": {
+    "opening": {
+      "total": 3,
+      "good": 1,
+      "accuracy": 0.3333333333333333,
+      "avg_time": 0.10116227467854817
+    },
+    "tactical": {
+      "total": 2,
+      "good": 0,
+      "accuracy": 0.0,
+      "avg_time": 0.10106325149536133
+    },
+    "endgame": {
+      "total": 2,
+      "good": 0,
+      "accuracy": 0.0,
+      "avg_time": 0.10117506980895996
+    },
+    "defensive": {
+      "total": 1,
+      "good": 0,
+      "accuracy": 0.0,
+      "avg_time": 0.10051345825195312
+    },
+    "complex": {
+      "total": 2,
+      "good": 0,
+      "accuracy": 0.0,
+      "avg_time": 0.10103702545166016
+    }
+  },
+  "by_difficulty": {
+    "easy": {
+      "total": 5,
+      "good": 1,
+      "accuracy": 0.2
+    },
+    "medium": {
+      "total": 3,
+      "good": 0,
+      "accuracy": 0.0
+    },
+    "hard": {
+      "total": 2,
+      "good": 0,
+      "accuracy": 0.0
+    }
+  },
+  "detailed_results": [
+    {
+      "position_id": "opening_001",
+      "position_name": "Starting Position",
+      "category": "opening",
+      "difficulty": "easy",
+      "agent_move": "e2e4",
+      "is_good_move": true,
+      "confidence": 0.31498412317019053,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "opening_002",
+      "position_name": "Italian Game Start",
+      "category": "opening",
+      "difficulty": "easy",
+      "agent_move": "g8e7",
+      "is_good_move": false,
+      "confidence": 0.46271770862658324,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "opening_003",
+      "position_name": "Sicilian Defense",
+      "category": "opening",
+      "difficulty": "easy",
+      "agent_move": "f1a6",
+      "is_good_move": false,
+      "confidence": 0.5506090662862646,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "tactical_001",
+      "position_name": "Knight Fork",
+      "category": "tactical",
+      "difficulty": "medium",
+      "agent_move": "c4d5",
+      "is_good_move": false,
+      "confidence": 0.3494128452085429,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "tactical_002",
+      "position_name": "Pin Opportunity",
+      "category": "tactical",
+      "difficulty": "medium",
+      "agent_move": "c4d3",
+      "is_good_move": false,
+      "confidence": 0.4667700825029383,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "endgame_001",
+      "position_name": "King and Pawn Endgame",
+      "category": "endgame",
+      "difficulty": "medium",
+      "agent_move": "f4g3",
+      "is_good_move": false,
+      "confidence": 0.5864181156189856,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "endgame_002",
+      "position_name": "Queen checkmate",
+      "category": "endgame",
+      "difficulty": "easy",
+      "agent_move": "a6c4",
+      "is_good_move": false,
+      "confidence": 0.341285971888363,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "defensive_001",
+      "position_name": "King Safety",
+      "category": "defensive",
+      "difficulty": "easy",
+      "agent_move": "d1e2",
+      "is_good_move": false,
+      "confidence": 0.4808179889009684,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "complex_001",
+      "position_name": "Middlegame Complexity",
+      "category": "complex",
+      "difficulty": "hard",
+      "agent_move": "d1e2",
+      "is_good_move": false,
+      "confidence": 0.32340235035279535,
+      "thinking_time": 0.101
+    },
+    {
+      "position_id": "complex_002",
+      "position_name": "Strategic Decision",
+      "category": "complex",
+      "difficulty": "hard",
+      "agent_move": "a1b1",
+      "is_good_move": false,
+      "confidence": 0.6023526967999795,
+      "thinking_time": 0.101
+    }
+  ]
+}
