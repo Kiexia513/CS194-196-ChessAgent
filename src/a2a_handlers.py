@@ -22,7 +22,6 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 import anyio
-import httpx
 from a2a.server.request_handlers.request_handler import RequestHandler
 from a2a.types import (
     DataPart,
@@ -42,7 +41,8 @@ from a2a.types import (
 )
 from a2a.utils.errors import ServerError
 
-from green_agent.agent_interface import AgentInterface, AgentResponse
+from green_agent.agent_interface import AgentInterface
+from http_white_agent import HTTPWhiteAgent
 
 
 _WHITE_URL_RE = re.compile(
@@ -180,49 +180,6 @@ class _BaseHandler(RequestHandler):
         raise ServerError(error=UnsupportedOperationError())
 
 
-class RemoteHTTPWhiteAgent(AgentInterface):
-    """
-    Remote white agent wrapper for the Green assessor.
-
-    The AgentBeats assessment provides a `white_agent_url` in the form:
-      https://<controller>/to_agent/<id>
-
-    This wrapper calls:
-      POST {white_agent_url}/reset
-      POST {white_agent_url}/move
-    """
-
-    def __init__(
-        self,
-        *,
-        base_url: str,
-        agent_id: str = "remote_white",
-        agent_name: str = "Remote White Agent",
-        timeout_s: float = 60.0,
-    ):
-        super().__init__(agent_id=agent_id, agent_name=agent_name)
-        self.base_url = base_url.rstrip("/")
-        self._client = httpx.Client(timeout=timeout_s)
-
-    def reset(self):
-        try:
-            self._client.post(f"{self.base_url}/reset")
-        except Exception:
-            # Treat reset as best-effort for remote agents.
-            return
-
-    def get_move(self, board_state: Dict[str, Any]) -> AgentResponse:
-        resp = self._client.post(f"{self.base_url}/move", json=board_state)
-        resp.raise_for_status()
-        data = resp.json()
-        return AgentResponse(
-            move_uci=data.get("move_uci") or data.get("move") or data.get("move_uci".upper(), ""),
-            confidence=data.get("confidence"),
-            reasoning=data.get("reasoning"),
-            metadata=data.get("metadata"),
-        )
-
-
 class GreenAssessorHandler(_BaseHandler):
     async def on_message_send(
         self,
@@ -269,7 +226,7 @@ def _run_green_assessment_sync(white_urls: list[str]) -> str:
     }
 
     for idx, url in enumerate(white_urls, start=1):
-        white_agent = RemoteHTTPWhiteAgent(
+        white_agent = HTTPWhiteAgent(
             base_url=url,
             agent_id=f"white_{idx}",
             agent_name=f"White Agent {idx}",

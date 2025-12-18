@@ -1,240 +1,189 @@
-# Chess Agents for AgentBeats (Green Assessor + White Player)
+# Chess Green Agent + Chess White Agent
 
-This repository implements two chess agents that can be deployed to the **AgentBeats v2** platform **from the same codebase** (deploy twice with different environment variables):
+This repository implements a two-agent chess evaluation workflow:
 
-- **Green Agent (Assessor)**: receives an assessment task, parses `<white_agent_url>...</white_agent_url>`, calls the White agent endpoints, runs a game, and returns an assessment summary.
-- **White Agent (Participant)**: given a position (FEN + optional legal moves), returns the next move (LLM-backed).
+- **Green Agent** (evaluator/orchestrator): runs a chess game between agents, validates moves, logs traces, and computes evaluation metrics.
+- **White Agent** (player): selects a legal move (UCI) given a board state (FEN + optional legal moves), optionally using an LLM with structured output and fallbacks.
 
-Both agents are exposed through the **AgentBeats Controller** (`agentbeats run_ctrl`) and support **A2A JSON-RPC** (required by AgentBeats assessments).
-
----
-
-## 1. Overview
-
-### Key entrypoints
-
-- `src/server.py`: selects Green vs White based on `AGENT_ROLE`
-- `src/green_service.py`: Green HTTP service + A2A(JSON-RPC)
-- `src/white_service.py`: White HTTP service + A2A(JSON-RPC)
-- `src/a2a_handlers.py`: A2A `message/send` handler implementations
-- `run.sh`: executed by the AgentBeats controller to start the internal agent process
-- `Procfile`: starts the controller on Cloud Run (`web: agentbeats run_ctrl`)
-
-### Public endpoints (via controller proxy)
-
-Controller (public):
-- `GET /status`
-- `GET /agents` (lists internal agents and their `to_agent/<id>` URLs)
-- `POST /agents/<id>/reset`
-- `/<...>/to_agent/<id>/...` (reverse proxy to the internal agent)
-
-Green agent (behind `to_agent/<id>`):
-- `GET /.well-known/agent-card.json`
-- `GET /healthz`
-- `POST /` (A2A JSON-RPC, required for AgentBeats assessment `message/send`)
-- `POST /play` (manual/local debugging)
-
-White agent (behind `to_agent/<id>`):
-- `GET /.well-known/agent-card.json`
-- `GET /healthz`
-- `POST /` (A2A JSON-RPC, optional)
-- `POST /reset`
-- `POST /move` (input `{fen, legal_moves, ...}` → output `move_uci`)
+In addition to the core agent implementations, the repo includes lightweight HTTP and A2A interfaces and a controller so the benchmark can also run remotely (e.g. on AgentBeats).
 
 ---
 
-## 2. Requirements
+## 1. Green Agent: implementation and evaluation philosophy
 
-### Python version
+**Core module:** `src/green_agent/chess_green_agent.py`
 
-This repo depends on `earthshaker` (AgentBeats runtime/controller). Use **Python 3.13+**.
+The Green Agent is designed as an *evaluation harness* rather than a chess engine:
 
-### Install dependencies
+1. **Environment-first**: the authoritative game state lives in `src/environment/chess_environment.py`. Agents only see a serialized view (FEN + minimal metadata).
+2. **Move validation and robustness**: for each ply, the Green agent:
+   - asks the current agent for a UCI move
+   - validates legality
+   - retries illegal moves (up to a small limit)
+   - falls back to a random legal move if needed (to keep the game progressing)
+3. **Separation of concerns**:
+   - orchestration: `ChessGreenAgent.run_game`
+   - game state + rules: `ChessEnvironment`
+   - scoring: `src/evaluation/metrics.py` (+ optional `stockfish_evaluator.py`)
+4. **Metrics as the output**: the evaluation output is a JSON object containing:
+   - result (`1-0`, `0-1`, `1/2-1/2`, or `*`)
+   - move-by-move log (including legality feedback and optional reasoning)
+   - aggregated metrics per side (ACPL, blunders/mistakes, etc.)
+
+### Stockfish integration (optional)
+
+If Stockfish is available, Green can compute centipawn-loss-based metrics (ACPL). This keeps evaluation objective and comparable across agents.
+
+---
+
+## 2. White Agent: implementation and decision pipeline
+
+**Core module:** `src/white_agent/agent.py`
+
+The White Agent follows a modular pipeline and prioritizes *interpretable decisions with safe fallbacks*:
+
+1. **Perception** (`src/white_agent/perception.py`):
+   - parses `fen` into a `python-chess` board
+   - derives lightweight features (material balance, center control, captures, etc.)
+2. **Memory** (`src/white_agent/memory.py`):
+   - stores recent moves and simple opponent-style heuristics
+   - provides compact context for prompting (recent move history + opponent summary)
+3. **Reasoning** (`src/white_agent/reasoning.py`):
+   - generates a small set of candidate legal moves (checks/captures/center-control first)
+   - assigns heuristic scores and produces a recommended move
+4. **LLM decision (optional)**:
+   - if `use_chain_of_thought` is enabled and an API key is available, the agent asks the LLM to pick among candidates
+   - the prompt enforces a strict JSON output format: `{ "move": "...", "reasoning": "...", "confidence": ... }`
+5. **Validation and fallback**:
+   - the final move is checked against the legal move list
+   - if invalid, the agent selects a fallback move (best remaining candidate, else random legal move)
+
+This design makes it possible to evaluate the same White agent both as:
+- a pure heuristic agent (no API key)
+- an LLM-backed agent (with structured decision output and robust fallbacks)
+
+---
+
+## 3. How to run White agent (complete the task)
+
+The White agent’s task: **given a board state, return a legal chess move in UCI format**.
+
+### A) Run White as a Python class (single move)
 
 ```bash
-pip install -r requirements.txt
+python -c "import sys; sys.path.insert(0,'src'); from white_agent import AgentConfig, WhiteAgent; cfg=AgentConfig(api_provider='deepseek', model='deepseek-chat', use_chain_of_thought=True, timeout=60); ag=WhiteAgent(agent_id='w', agent_name='White', config=cfg); s={'fen':'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1','legal_moves':['e2e4','d2d4','g1f3','c2c4'],'move_number':1}; print(ag.get_move(s))"
 ```
 
-### LLM API keys (do not commit secrets)
+### B) Run White as an HTTP service and call `/move`
 
-Use environment variables:
-- `DEEPSEEK_API_KEY`
-- `OPENAI_API_KEY`
-- `GOOGLE_API_KEY`
-
-Optional simple auth (recommended for public deployments):
-- `AGENT_API_KEY`: if set, `POST /play`, `POST /move`, `POST /reset` require header `X-API-Key: <AGENT_API_KEY>`
-
-For local-only development you can create `src/api/api.txt` (ignored by git), but do not commit real keys.
-
----
-
-## 3. Run locally (controller + internal agent)
+Start White:
 
 ```bash
-agentbeats run_ctrl
+AGENT_ROLE=white python -m uvicorn src.server:app --host 0.0.0.0 --port 8002
 ```
 
-Open the controller UI: `http://localhost:8010/info`
-
-Get the internal agent ID:
-
-```powershell
-Invoke-WebRequest -Uri "http://localhost:8010/agents"
-```
-
-Then access the internal agent via `to_agent/<id>`:
-- `GET http://localhost:8010/to_agent/<id>/.well-known/agent-card.json`
-- `GET http://localhost:8010/to_agent/<id>/healthz`
-
----
-
-## 4. Deploy to Cloud Run (deploy twice from the same repo)
-
-You will deploy two Cloud Run services:
-
-- `chess-green-agent`: `AGENT_ROLE=green`
-- `chess-white-agent`: `AGENT_ROLE=white`
-
-### 4.1 Deploy (build from source)
+Request a move:
 
 ```bash
-gcloud run deploy chess-green-agent --source . --allow-unauthenticated --port 8010 --region us-central1
-gcloud run deploy chess-white-agent --source . --allow-unauthenticated --port 8010 --region us-central1
+curl -X POST "http://localhost:8002/move" \
+  -H "Content-Type: application/json" \
+  -d "{\"fen\":\"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1\",\"legal_moves\":[\"e2e4\",\"d2d4\",\"g1f3\",\"c2c4\"],\"move_number\":1}"
 ```
 
-PowerShell (Windows):
+---
 
-```powershell
-gcloud.cmd run deploy chess-green-agent --source . --allow-unauthenticated --port 8010 --region us-central1
-gcloud.cmd run deploy chess-white-agent --source . --allow-unauthenticated --port 8010 --region us-central1
+## 4. How to run Green agent (evaluate White agents)
+
+### A) Evaluate a White agent locally (Python-to-Python)
+
+```python
+from green_agent import ChessGreenAgent, RandomAgent, SimpleGreedyAgent
+
+green = ChessGreenAgent(agent_id="local_green", use_stockfish=False)
+
+white = SimpleGreedyAgent(agent_id="white", agent_name="Greedy White")
+black = RandomAgent(agent_id="black", agent_name="Random Black")
+
+result = green.run_game(white_agent=white, black_agent=black, max_moves=30)
+print(result["result"], result["total_moves"])
+green.close()
 ```
 
-### 4.2 Set required env vars (critical)
+### B) Evaluate an HTTP White agent (reproducible command)
 
-Replace `<...-service-url-host>` with your Cloud Run hostname (without `https://`), for example:
-`chess-green-agent-903107533568.us-central1.run.app`
-
-**Green:**
-```bash
-gcloud run services update chess-green-agent --region us-central1 \
-  --set-env-vars AGENT_ROLE=green \
-  --set-env-vars PUBLIC_BASE_URL=https://<green-service-url-host> \
-  --set-env-vars CLOUDRUN_HOST=<green-service-url-host> \
-  --set-env-vars HTTPS_ENABLED=true
-```
-
-PowerShell (Windows):
-
-```powershell
-gcloud.cmd run services update chess-green-agent --region us-central1 `
-  --set-env-vars AGENT_ROLE=green `
-  --set-env-vars PUBLIC_BASE_URL=https://<green-service-url-host> `
-  --set-env-vars CLOUDRUN_HOST=<green-service-url-host> `
-  --set-env-vars HTTPS_ENABLED=true
-```
-
-**White:**
-```bash
-gcloud run services update chess-white-agent --region us-central1 \
-  --set-env-vars AGENT_ROLE=white \
-  --set-env-vars PUBLIC_BASE_URL=https://<white-service-url-host> \
-  --set-env-vars CLOUDRUN_HOST=<white-service-url-host> \
-  --set-env-vars HTTPS_ENABLED=true
-```
-
-PowerShell (Windows):
-
-```powershell
-gcloud.cmd run services update chess-white-agent --region us-central1 `
-  --set-env-vars AGENT_ROLE=white `
-  --set-env-vars PUBLIC_BASE_URL=https://<white-service-url-host> `
-  --set-env-vars CLOUDRUN_HOST=<white-service-url-host> `
-  --set-env-vars HTTPS_ENABLED=true
-```
-
-Why `PUBLIC_BASE_URL` matters: AgentBeats assessments read `/.well-known/agent-card.json` and use the `url` field as the A2A JSON-RPC base URL. If it becomes `0.0.0.0`/`localhost`, remote runners will fail to connect (503 connect errors).
-
-### 4.3 Recommended stability settings (assessment-friendly)
+If White is exposed via HTTP (local or remote), evaluate it with:
 
 ```bash
-gcloud run services update chess-green-agent --region us-central1 --min-instances 1 --cpu 1 --memory 1Gi --timeout 3600 --concurrency 1
-gcloud run services update chess-white-agent --region us-central1 --min-instances 1 --cpu 1 --memory 1Gi --timeout 3600 --concurrency 1
+python scripts/evaluate_http_white.py --white-url http://localhost:8002 --max-moves 30 --black greedy
 ```
 
-PowerShell (Windows):
+This prints a JSON result and writes game logs under `logs/http_eval/`.
 
-```powershell
-gcloud.cmd run services update chess-green-agent --region us-central1 --min-instances 1 --cpu 1 --memory 1Gi --timeout 3600 --concurrency 1
-gcloud.cmd run services update chess-white-agent --region us-central1 --min-instances 1 --cpu 1 --memory 1Gi --timeout 3600 --concurrency 1
+---
+
+## 5. Test Green evaluation outputs (test cases)
+
+### Validation examples (short, mostly deterministic)
+
+```bash
+python tests/validation_examples.py
+```
+
+### Unit/integration tests
+
+```bash
+python tests/test_environment.py
+python tests/test_evaluation.py
+python tests/test_complete_system.py
+```
+
+Notes:
+- Some evaluation tests require Stockfish. Install Stockfish and set `STOCKFISH_PATH` if needed.
+
+---
+
+## 6. Reproduce baseline benchmark runs (existing benchmark)
+
+This repo includes a simple baseline runner for quick smoke tests:
+
+```bash
+python tests/test_llm_agents.py quick
+```
+
+For a longer LLM-vs-LLM run (requires API keys):
+
+```bash
+python tests/test_llm_agents.py full
 ```
 
 ---
 
-## 5. Create an assessment on AgentBeats v2
+## 7. Remote deployment (AgentBeats / Cloud Run)
 
-1. Register both **controller URLs** on AgentBeats (the Green Cloud Run URL and the White Cloud Run URL).
-2. Ensure both agents show a successful agent check and a valid agent card.
-3. Create an assessment selecting Green as the **assessor** and White as the **participant**.
+This repository includes a controller + proxy pattern so both Green and White can run remotely:
 
----
+- A controller process exposes `/agents` and proxies requests to an internal agent instance.
+- The internal agent serves `/.well-known/agent-card.json` and A2A JSON-RPC at `POST /` (used by remote assessments).
 
-## 6. White Agent configuration (LLM)
-
-Configure the White agent using environment variables (recommended on Cloud Run):
-
-- `WHITE_API_PROVIDER`: default `deepseek` (or `openai` / `google`)
-- `WHITE_MODEL`: default `deepseek-chat`
-- `WHITE_USE_COT`: `true/false` (default `true`)
-- `WHITE_TIMEOUT`: default `60` (seconds)
+Full, step-by-step deployment notes (including the required env vars like `PUBLIC_BASE_URL` to avoid `0.0.0.0` agent-card URLs) are in:
+- `AGENTBEATS_DEPLOY.md`
 
 ---
 
-## 7. Green assessment settings (optional)
-
-The Green A2A assessor supports:
-
-- `ASSESSMENT_MAX_MOVES` (default `20`)
-- `ASSESSMENT_BLACK_AGENT`: `greedy` (default) or `random`
-- `ASSESSMENT_REMOTE_TIMEOUT` (default `60`) timeout for remote White `/move`
-- `ASSESSMENT_USE_STOCKFISH`: default `false` (Cloud Run usually does not include Stockfish)
-
----
-
-## 8. Troubleshooting
-
-### 8.1 Assessment returns 404
-
-AgentBeats sends A2A JSON-RPC to `POST /` at the agent base URL (from the agent card `url`). Make sure the service exposes A2A JSON-RPC at the root path.
-
-### 8.2 Assessment returns 503 “All connection attempts failed”
-
-This almost always means the agent card `url` is not reachable from the internet (e.g. `http://0.0.0.0:8010/...`).
-
-Check:
-```powershell
-$green = "https://<green-service-url>"
-$gid = (Invoke-WebRequest -Uri "$green/agents" | ConvertFrom-Json).psobject.Properties.Name | Select-Object -First 1
-(Invoke-WebRequest -Uri "$green/to_agent/$gid/.well-known/agent-card.json" | ConvertFrom-Json).url
-```
-
-Make sure it returns `https://<green-service-url>/to_agent/<id>`.
-
----
-
-## 9. Project layout (short)
+## Project layout (short)
 
 ```
 src/
-  server.py              # entrypoint: AGENT_ROLE=green/white
-  green_service.py       # Green HTTP + A2A(JSON-RPC)
-  white_service.py       # White HTTP + A2A(JSON-RPC)
-  a2a_handlers.py        # A2A message/send handlers (green/white)
-  green_agent/           # evaluation + game orchestration
-  white_agent/           # White agent (LLM-backed)
+  green_agent/           # Green evaluator + baseline/LLM agents
+  white_agent/           # White player agent implementation
+  environment/           # Chess environment + models
+  evaluation/            # Stockfish evaluator + metrics
+  visualization/         # Report/chart generation
+  green_service.py       # Optional HTTP interface (Green)
+  white_service.py       # Optional HTTP interface (White)
 tests/
-run.sh                   # internal agent launcher (used by controller)
-Procfile                 # controller entrypoint for Cloud Run
+scripts/
+  evaluate_http_white.py # Evaluate an HTTP White agent via Green
 ```
 
 ---
