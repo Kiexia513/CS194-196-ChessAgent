@@ -20,7 +20,7 @@ The **Green Agent** acts as an evaluator and orchestrator, responsible for:
 - ✅ **Step 3**: Evaluation Metrics - Stockfish integration and ACPL calculation
 - ✅ **Step 4**: Green Agent Core Logic - Game orchestration and LLM agent integration
 - ✅ **Step 5**: Logging and Visualization System - HTML reports, charts, and game replay
-- ⏳ **Step 6**: A2A Protocol Integration
+- ✅ **Step 6**: A2A + AgentBeats Controller Integration
 - ⏳ **Step 7**: Testing and Optimization
 
 ## 🚀 Quick Start
@@ -53,13 +53,71 @@ This repo will auto-detect Stockfish in the following order:
 
 ### 3. Configure API Keys
 
-Create `src/api/api.txt` with your LLM API keys:
+For local development you can create `src/api/api.txt` with your LLM API keys (this file is ignored by git):
 
 ```
 deepseek: YOUR_DEEPSEEK_API_KEY
 openai: YOUR_OPENAI_API_KEY
 google: YOUR_GOOGLE_API_KEY
 ```
+
+Recommended (especially for deployment): use environment variables instead:
+- `DEEPSEEK_API_KEY`
+- `OPENAI_API_KEY`
+- `GOOGLE_API_KEY`
+
+## 🎛️ AgentBeats Deployment (Green + White)
+
+This repo can be deployed to AgentBeats v2 as **two separate remote agents** (two Cloud Run services), using the same codebase:
+- **Green (assessor)**: `AGENT_ROLE=green` (default) → exposes `POST /play`
+- **White (participant)**: `AGENT_ROLE=white` → exposes `POST /move`
+
+Both deployments are managed by the AgentBeats controller (`agentbeats run_ctrl`) and must expose an A2A Agent Card at `/.well-known/agent-card.json`.
+AgentBeats assessments also send A2A JSON-RPC requests to the **agent base URL** (the `url` field in the agent card), so this repo exposes an A2A JSON-RPC endpoint at `POST /` (required for remote assessments).
+
+### Key Environment Variables
+
+- `AGENT_ROLE`: `green` or `white`
+- `CLOUDRUN_HOST`: set to your Cloud Run hostname (without `https://`) so AgentBeats can load agent URLs (avoids `0.0.0.0` URLs)
+- `HTTPS_ENABLED`: set to `true` on Cloud Run
+- `AGENT_API_KEY` (optional but recommended): if set, requests to `/play` and `/move` require header `X-API-Key`
+- `ASSESSMENT_MAX_MOVES` (green, optional): max moves per assessment game (default: `20`)
+- `ASSESSMENT_BLACK_AGENT` (green, optional): `greedy` (default) or `random`
+- `ASSESSMENT_REMOTE_TIMEOUT` (green, optional): seconds for each remote `/move` call (default: `60`)
+
+### Local: Run Controller
+
+```bash
+pip install -r requirements.txt
+agentbeats run_ctrl
+```
+
+Then access the controller UI at `http://localhost:8010`, and use the proxy URL:
+- `GET http://localhost:8010/to_agent/<id>/.well-known/agent-card.json`
+- `GET http://localhost:8010/to_agent/<id>/healthz`
+
+### Cloud Run: Deploy Green (Assessor)
+
+```bash
+gcloud run deploy chess-green-agent --source . --allow-unauthenticated --port 8010 --region us-central1
+gcloud run services update chess-green-agent --region us-central1 \
+  --set-env-vars AGENT_ROLE=green \
+  --set-env-vars CLOUDRUN_HOST=<your-green-hostname> \
+  --set-env-vars HTTPS_ENABLED=true
+```
+
+### Cloud Run: Deploy White (Participant)
+
+```bash
+gcloud run deploy chess-white-agent --source . --allow-unauthenticated --port 8010 --region us-central1
+gcloud run services update chess-white-agent --region us-central1 \
+  --set-env-vars AGENT_ROLE=white \
+  --set-env-vars CLOUDRUN_HOST=<your-white-hostname> \
+  --set-env-vars HTTPS_ENABLED=true
+```
+
+Register both controller URLs on AgentBeats v2, then create an assessment selecting:
+1) your Green (assessor) agent, and 2) your White (participant) agent.
 
 ### 4. Run Tests
 
@@ -112,6 +170,10 @@ project/
 │   ├── config/                    # Configuration
 │   │   ├── const.py               # Constants and thresholds
 │   │   └── api_config.py          # API configuration
+│   ├── white_agent/               # White Agent implementation (participant agent)
+│   ├── green_service.py           # Green HTTP service (AgentBeats)
+│   ├── white_service.py           # White HTTP service (AgentBeats)
+│   └── server.py                  # Role-based entrypoint (AGENT_ROLE)
 │   └── api/                       # API keys (not in repo)
 │       └── api.txt                # API keys file
 ├── tests/                         # Test suite
@@ -381,8 +443,8 @@ All games are automatically logged to `logs/` with:
 
 ## 🚧 Upcoming Features
 
-- [ ] **Step 6**: A2A (Agent-to-Agent) Protocol Integration
-- [ ] **Step 7**: Advanced Testing and Optimization
+- [ ] Assessment UI polish for AgentBeats v2
+- [ ] Advanced testing and optimization
 - [ ] Tournament mode (multiple games, statistical analysis)
 - [ ] Custom evaluation profiles
 - [ ] Real-time game monitoring dashboard

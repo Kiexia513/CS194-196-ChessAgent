@@ -14,9 +14,11 @@ import os
 from typing import Any, Dict, Optional
 
 from a2a.types import AgentCapabilities, AgentCard, AgentSkill
+from a2a.server.apps.jsonrpc.fastapi_app import A2AFastAPIApplication
 from fastapi import Body, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from a2a_handlers import WhiteMoveHandler
 from white_agent import AgentConfig, WhiteAgent
 
 
@@ -62,6 +64,24 @@ def _get_agent() -> WhiteAgent:
     )
     _agent = WhiteAgent(agent_id="white_agent", agent_name="White Agent", config=config)
     return _agent
+
+
+# Add A2A JSON-RPC endpoint at `/` so other agents (e.g. the Green assessor)
+# can call this white agent via A2A if they choose to.
+_a2a_app = A2AFastAPIApplication(
+    agent_card=AgentCard(
+        name=APP_NAME,
+        description="Chess white agent (A2A JSON-RPC enabled).",
+        url="http://localhost",
+        version=APP_VERSION,
+        capabilities=AgentCapabilities(),
+        default_input_modes=["text"],
+        default_output_modes=["text"],
+        skills=[],
+    ),
+    http_handler=WhiteMoveHandler(_get_agent),
+)
+_a2a_app.add_routes_to_app(app, agent_card_url="/__a2a_agent_card", rpc_url="/")
 
 
 @app.get("/.well-known/agent-card.json")
@@ -134,4 +154,3 @@ def move(
         "reasoning": resp.reasoning,
         "metadata": resp.metadata,
     }
-

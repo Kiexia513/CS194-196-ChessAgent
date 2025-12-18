@@ -13,9 +13,11 @@ from enum import Enum
 from typing import Optional
 
 from a2a.types import AgentCapabilities, AgentCard, AgentSkill
+from a2a.server.apps.jsonrpc.fastapi_app import A2AFastAPIApplication
 from fastapi import Body, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from a2a_handlers import GreenAssessorHandler
 from green_agent import (
     ChessGreenAgent,
     ChatGPTAgent,
@@ -30,6 +32,24 @@ APP_NAME = "Chess Green Agent"
 APP_VERSION = "0.1.0"
 
 app = FastAPI(title=APP_NAME, version=APP_VERSION)
+
+# Add A2A JSON-RPC endpoint at `/` for AgentBeats assessments.
+# We keep our own `/.well-known/agent-card.json` implementation, but we expose
+# the A2A RPC route so the platform can call `message/send`.
+_a2a_app = A2AFastAPIApplication(
+    agent_card=AgentCard(
+        name=APP_NAME,
+        description="Chess evaluation green agent (A2A JSON-RPC enabled).",
+        url="http://localhost",
+        version=APP_VERSION,
+        capabilities=AgentCapabilities(),
+        default_input_modes=["text"],
+        default_output_modes=["text"],
+        skills=[],
+    ),
+    http_handler=GreenAssessorHandler(),
+)
+_a2a_app.add_routes_to_app(app, agent_card_url="/__a2a_agent_card", rpc_url="/")
 
 
 class AgentType(str, Enum):
@@ -186,4 +206,3 @@ def play(
     )
     green_agent.close()
     return results
-
