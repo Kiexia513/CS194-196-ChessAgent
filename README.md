@@ -1,468 +1,243 @@
-# Chess Green Agent - LLM Chess Evaluation System
+# Chess Agents for AgentBeats (Green Assessor + White Player)
 
-**LLM Agent Evaluations Project for Berkeley CS194 - Unit 3**
+这个仓库实现了两类可部署到 AgentBeats v2 的国际象棋 Agent（同一份代码、两次部署）：
 
-A comprehensive evaluation framework for assessing Large Language Model (LLM) agents' chess-playing capabilities using objective metrics and professional chess engine analysis.
+- **Green Agent（Assessor / 评测者）**：接收评测任务，解析 `<white_agent_url>`，调用 White 的接口并跑一局对局，输出评测 summary。
+- **White Agent（Participant / 参赛者）**：根据 FEN/合法走法给出下一步走子（可由 LLM 支持）。
 
-## 🎯 What is a Green Agent?
+> 两个 Agent 都通过 **AgentBeats Controller**（`agentbeats run_ctrl`）对外暴露，并且支持 **A2A JSON-RPC**（AgentBeats assessment 会用到）。
 
-The **Green Agent** acts as an evaluator and orchestrator, responsible for:
-- 🎮 Setting up chess game environments
-- 📋 Distributing tasks to participant agents (LLM agents)
-- 📊 Collecting and analyzing game results
-- ✅ Validating environment correctness
-- 📈 Reporting evaluation metrics
+---
 
-## 📊 Project Status
+## 1. 快速概览
 
-- ✅ **Step 1**: Task Selection - Chess Game Evaluation
-- ✅ **Step 2**: Environment Design - Tools, actions, and feedback mechanisms
-- ✅ **Step 3**: Evaluation Metrics - Stockfish integration and ACPL calculation
-- ✅ **Step 4**: Green Agent Core Logic - Game orchestration and LLM agent integration
-- ✅ **Step 5**: Logging and Visualization System - HTML reports, charts, and game replay
-- ✅ **Step 6**: A2A + AgentBeats Controller Integration
-- ⏳ **Step 7**: Testing and Optimization
+### 目录里关键入口
 
-## 🚀 Quick Start
+- `src/server.py`：根据环境变量 `AGENT_ROLE` 选择启动 green 或 white 服务
+- `src/green_service.py`：Green HTTP + A2A(JSON-RPC) 服务
+- `src/white_service.py`：White HTTP + A2A(JSON-RPC) 服务
+- `src/a2a_handlers.py`：A2A `message/send` 的具体处理逻辑
+- `run.sh`：AgentBeats controller 启动内部 agent 进程时执行
+- `Procfile`：Cloud Run/平台启动 controller：`web: agentbeats run_ctrl`
 
-### 1. Installation
+### 支持的对外接口（通过 controller 代理）
+
+Controller（对外）：
+- `GET /status`
+- `GET /agents`：列出内部 agent 实例（并给出 `to_agent/<id>` URL）
+- `POST /agents/<id>/reset`
+- `/<...>/to_agent/<id>/...`：代理到内部 agent
+
+Green agent（被代理后，基于 `to_agent/<id>`）：
+- `GET /.well-known/agent-card.json`
+- `GET /healthz`
+- `POST /`：A2A JSON-RPC（必须，用于 AgentBeats assessment 的 `message/send`）
+- `POST /play`：手动跑一局（本地自测/调试用）
+
+White agent（被代理后）：
+- `GET /.well-known/agent-card.json`
+- `GET /healthz`
+- `POST /`：A2A JSON-RPC（可选，用于 A2A 方式请求 move/reset）
+- `POST /reset`
+- `POST /move`：输入 `{fen, legal_moves, ...}`，输出 `move_uci`
+
+---
+
+## 2. 环境准备
+
+### Python 版本
+
+由于依赖 `earthshaker`（AgentBeats runtime/controller），建议使用 **Python 3.13+**（你之前安装时也遇到过版本要求）。
+
+### 安装依赖
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd project
-
-# Install dependencies
 pip install -r requirements.txt
 ```
 
-**Required Python Version**: 3.10 or higher
+### LLM API Key（不要写进仓库）
 
-### 2. Install Stockfish (Optional but Recommended)
-
-Stockfish is used for objective move quality evaluation and ACPL (Average Centipawn Loss) calculation.
-
-**Download**: https://stockfishchess.org/download/
-
-Extract and place in `engines/` directory or add to system `PATH`.
-
-This repo will auto-detect Stockfish in the following order:
-1. `STOCKFISH_PATH` / `STOCKFISH_BINARY` environment variable
-2. A local binary under `engines/`
-3. `stockfish` on `PATH`
-
-### 3. Configure API Keys
-
-For local development you can create `src/api/api.txt` with your LLM API keys (this file is ignored by git):
-
-```
-deepseek: YOUR_DEEPSEEK_API_KEY
-openai: YOUR_OPENAI_API_KEY
-google: YOUR_GOOGLE_API_KEY
-```
-
-Recommended (especially for deployment): use environment variables instead:
+推荐用环境变量：
 - `DEEPSEEK_API_KEY`
 - `OPENAI_API_KEY`
 - `GOOGLE_API_KEY`
 
-## 🎛️ AgentBeats Deployment (Green + White)
+可选的简单鉴权（建议线上开启）：
+- `AGENT_API_KEY`：如果设置了，调用 `POST /play`、`POST /move`、`POST /reset` 需要带请求头 `X-API-Key: <AGENT_API_KEY>`
 
-This repo can be deployed to AgentBeats v2 as **two separate remote agents** (two Cloud Run services), using the same codebase:
-- **Green (assessor)**: `AGENT_ROLE=green` (default) → exposes `POST /play`
-- **White (participant)**: `AGENT_ROLE=white` → exposes `POST /move`
+本地开发也可创建 `src/api/api.txt`（已在 `.gitignore` 中忽略），但不要提交真实 key。
 
-Both deployments are managed by the AgentBeats controller (`agentbeats run_ctrl`) and must expose an A2A Agent Card at `/.well-known/agent-card.json`.
-AgentBeats assessments also send A2A JSON-RPC requests to the **agent base URL** (the `url` field in the agent card), so this repo exposes an A2A JSON-RPC endpoint at `POST /` (required for remote assessments).
+---
 
-### Key Environment Variables
-
-- `AGENT_ROLE`: `green` or `white`
-- `CLOUDRUN_HOST`: set to your Cloud Run hostname (without `https://`) so AgentBeats can load agent URLs (avoids `0.0.0.0` URLs)
-- `HTTPS_ENABLED`: set to `true` on Cloud Run
-- `AGENT_API_KEY` (optional but recommended): if set, requests to `/play` and `/move` require header `X-API-Key`
-- `ASSESSMENT_MAX_MOVES` (green, optional): max moves per assessment game (default: `20`)
-- `ASSESSMENT_BLACK_AGENT` (green, optional): `greedy` (default) or `random`
-- `ASSESSMENT_REMOTE_TIMEOUT` (green, optional): seconds for each remote `/move` call (default: `60`)
-
-### Local: Run Controller
+## 3. 本地运行（controller + 内部 agent）
 
 ```bash
-pip install -r requirements.txt
 agentbeats run_ctrl
 ```
 
-Then access the controller UI at `http://localhost:8010`, and use the proxy URL:
+打开 controller 页面：`http://localhost:8010/info`  
+拿到内部 agent 的 ID：
+
+```powershell
+Invoke-WebRequest -Uri "http://localhost:8010/agents"
+```
+
+然后用 `to_agent/<id>` 访问内部 agent：
 - `GET http://localhost:8010/to_agent/<id>/.well-known/agent-card.json`
 - `GET http://localhost:8010/to_agent/<id>/healthz`
 
-### Cloud Run: Deploy Green (Assessor)
+---
+
+## 4. Cloud Run 部署（同一仓库部署两次）
+
+你需要部署两个 Cloud Run service：
+
+- `chess-green-agent`：`AGENT_ROLE=green`
+- `chess-white-agent`：`AGENT_ROLE=white`
+
+### 4.1 部署（build from source）
 
 ```bash
 gcloud run deploy chess-green-agent --source . --allow-unauthenticated --port 8010 --region us-central1
+gcloud run deploy chess-white-agent --source . --allow-unauthenticated --port 8010 --region us-central1
+```
+
+PowerShell 版本（Windows）：
+
+```powershell
+gcloud.cmd run deploy chess-green-agent --source . --allow-unauthenticated --port 8010 --region us-central1
+gcloud.cmd run deploy chess-white-agent --source . --allow-unauthenticated --port 8010 --region us-central1
+```
+
+### 4.2 设置关键环境变量（非常重要）
+
+把 `<...-service-url-host>` 替换成 Cloud Run 的域名（不含 `https://`），例如：
+`chess-green-agent-903107533568.us-central1.run.app`
+
+**Green：**
+```bash
 gcloud run services update chess-green-agent --region us-central1 \
   --set-env-vars AGENT_ROLE=green \
-  --set-env-vars CLOUDRUN_HOST=<your-green-hostname> \
+  --set-env-vars PUBLIC_BASE_URL=https://<green-service-url-host> \
+  --set-env-vars CLOUDRUN_HOST=<green-service-url-host> \
   --set-env-vars HTTPS_ENABLED=true
 ```
 
-### Cloud Run: Deploy White (Participant)
+PowerShell 版本（Windows）：
 
+```powershell
+gcloud.cmd run services update chess-green-agent --region us-central1 `
+  --set-env-vars AGENT_ROLE=green `
+  --set-env-vars PUBLIC_BASE_URL=https://<green-service-url-host> `
+  --set-env-vars CLOUDRUN_HOST=<green-service-url-host> `
+  --set-env-vars HTTPS_ENABLED=true
+```
+
+**White：**
 ```bash
-gcloud run deploy chess-white-agent --source . --allow-unauthenticated --port 8010 --region us-central1
 gcloud run services update chess-white-agent --region us-central1 \
   --set-env-vars AGENT_ROLE=white \
-  --set-env-vars CLOUDRUN_HOST=<your-white-hostname> \
+  --set-env-vars PUBLIC_BASE_URL=https://<white-service-url-host> \
+  --set-env-vars CLOUDRUN_HOST=<white-service-url-host> \
   --set-env-vars HTTPS_ENABLED=true
 ```
 
-Register both controller URLs on AgentBeats v2, then create an assessment selecting:
-1) your Green (assessor) agent, and 2) your White (participant) agent.
+PowerShell 版本（Windows）：
 
-### 4. Run Tests
+```powershell
+gcloud.cmd run services update chess-white-agent --region us-central1 `
+  --set-env-vars AGENT_ROLE=white `
+  --set-env-vars PUBLIC_BASE_URL=https://<white-service-url-host> `
+  --set-env-vars CLOUDRUN_HOST=<white-service-url-host> `
+  --set-env-vars HTTPS_ENABLED=true
+```
+
+> 为什么 `PUBLIC_BASE_URL` 必须设置：AgentBeats assessment 会读取 agent-card.json 里的 `url` 字段并对这个 URL 发起 A2A JSON-RPC；如果 `url` 变成 `0.0.0.0`/`localhost`，远端 runner 会连接失败（你之前的 503 就是这个原因）。
+
+### 4.3（建议）为 assessment 稳定性调参
 
 ```bash
-# Test environment
-python tests/test_environment.py
-
-# Test evaluation system (requires Stockfish)
-python tests/test_evaluation.py
-
-# Test LLM agents
-python tests/test_llm_agents.py single
-
-# Complete system test
-python tests/test_complete_system.py
-
-# Full LLM vs LLM game
-python tests/test_llm_agents.py full
-
-# Manual validation: run 3 example test cases and print evaluation summaries
-python tests/validation_examples.py
+gcloud run services update chess-green-agent --region us-central1 --min-instances 1 --cpu 1 --memory 1Gi --timeout 3600 --concurrency 1
+gcloud run services update chess-white-agent --region us-central1 --min-instances 1 --cpu 1 --memory 1Gi --timeout 3600 --concurrency 1
 ```
 
-## 🏗️ Project Structure
+PowerShell 版本（Windows）：
 
+```powershell
+gcloud.cmd run services update chess-green-agent --region us-central1 --min-instances 1 --cpu 1 --memory 1Gi --timeout 3600 --concurrency 1
+gcloud.cmd run services update chess-white-agent --region us-central1 --min-instances 1 --cpu 1 --memory 1Gi --timeout 3600 --concurrency 1
 ```
-project/
-├── docs/                           # Documentation
-│   ├── environment_design.md       # Environment design specification
-│   ├── METRICS_DESIGN.md          # Evaluation metrics design
-│   ├── EVALUATION_SYSTEM.md       # Evaluation system usage guide
-│   └── VISUALIZATION_GUIDE.md     # Visualization system guide
-├── src/                           # Source code
-│   ├── environment/               # Chess game environment
-│   │   ├── chess_environment.py   # Core chess environment
-│   │   └── models.py              # Data models (Pydantic)
-│   ├── evaluation/                # Evaluation system
-│   │   ├── metrics.py             # Metrics (ACPL, move quality)
-│   │   └── stockfish_evaluator.py # Stockfish engine integration
-│   ├── green_agent/               # Green Agent implementation
-│   │   ├── chess_green_agent.py   # Main orchestrator
-│   │   ├── llm_agents.py          # LLM agent implementations
-│   │   ├── sample_agents.py       # Sample agents (Random, Greedy)
-│   │   └── agent_interface.py     # Agent interface definition
-│   ├── visualization/             # Visualization system
-│   │   ├── html_reporter.py       # HTML game reports
-│   │   ├── chart_generator.py     # Analytics charts
-│   │   ├── game_replay.py         # Interactive game replay
-│   │   └── chess_board_renderer.py # Graphical board rendering
-│   ├── config/                    # Configuration
-│   │   ├── const.py               # Constants and thresholds
-│   │   └── api_config.py          # API configuration
-│   ├── white_agent/               # White Agent implementation (participant agent)
-│   ├── green_service.py           # Green HTTP service (AgentBeats)
-│   ├── white_service.py           # White HTTP service (AgentBeats)
-│   └── server.py                  # Role-based entrypoint (AGENT_ROLE)
-│   └── api/                       # API keys (not in repo)
-│       └── api.txt                # API keys file
-├── tests/                         # Test suite
-│   ├── test_environment.py        # Environment tests
-│   ├── test_evaluation.py         # Evaluation system tests
-│   ├── test_llm_agents.py         # LLM agent tests
-│   ├── test_complete_system.py    # End-to-end system tests
-│   └── test_visualization.py      # Visualization tests
-├── logs/                          # Game logs (auto-generated)
-│   └── */                         # Organized by test run
-├── requirements.txt               # Python dependencies
-└── README.md                      # This file
-```
-
-## 🎮 Environment Design
-
-### Available Tools
-
-1. **get_board_state** - Get current board state (FEN, legal moves)
-2. **make_move** - Execute a move (UCI or SAN format)
-3. **get_legal_moves** - Get all legal moves
-4. **get_move_history** - View game history
-5. **check_rules** - Query chess rules
-6. **analyze_position** - Analyze current position
-7. **offer_draw** - Propose a draw
-8. **resign** - Resign the game
-
-### Supported Actions
-
-- `QUERY_STATE` - Query game state
-- `MAKE_MOVE` - Make a chess move
-- `GET_MOVES` - Get legal moves
-- `VIEW_HISTORY` - View move history
-- `CHECK_RULES` - Query rules
-- `ANALYZE` - Analyze position
-- `OFFER_DRAW` - Offer draw
-- `RESIGN` - Resign game
-
-### Feedback Types
-
-- `move_success` - Move executed successfully
-- `move_error` - Move failed (illegal, invalid format)
-- `opponent_moved` - Opponent made a move
-- `game_over` - Game ended (checkmate, stalemate, draw)
-- `check_warning` - King is in check
-- `time_warning` - Time running low
-- `protocol_violation` - Protocol error
-
-See `docs/environment_design.md` for detailed specifications.
-
-## 📊 Evaluation Metrics
-
-### Core Metrics
-
-1. **ACPL (Average Centipawn Loss)**
-   - Gold standard for chess skill measurement
-   - Objective and quantifiable
-   - Correlates with human ELO ratings
-   - **< 10**: Super Grandmaster (2700+ ELO)
-   - **10-20**: Grandmaster (2500-2700 ELO)
-   - **20-30**: International Master (2400-2500 ELO)
-   - **30-50**: Expert (2200-2400 ELO)
-   - **50-100**: Advanced (1800-2200 ELO)
-   - **100-200**: Intermediate (1400-1800 ELO)
-   - **200+**: Beginner (<1400 ELO)
-
-2. **Move Quality Classification**
-   - **Best** (0 cp loss) - Engine's top choice
-   - **Excellent** (≤10 cp loss) - Strong move
-   - **Good** (10-25 cp loss) - Solid move
-   - **Inaccuracy** (25-50 cp loss) - Suboptimal
-   - **Mistake** (50-100 cp loss) - Poor move
-   - **Blunder** (>100 cp loss) - Major error
-   - **Catastrophic** (>300 cp loss) - Game-losing
-
-3. **Tactical Statistics**
-   - Blunders, mistakes, and inaccuracies count
-   - Best and excellent move percentage
-   - Tactical opportunity recognition
-
-4. **Phase Performance**
-   - **Opening** (moves 1-10): Development and control
-   - **Middlegame** (moves 11-30): Strategy and tactics
-   - **Endgame** (move 31+): Technique and precision
-
-### Usage Example
-
-```python
-from green_agent import ChessGreenAgent, DeepSeekAgent, ChatGPTAgent
-
-# Create Green Agent
-green_agent = ChessGreenAgent(
-    agent_id="evaluator",
-    use_stockfish=True,
-    log_dir="logs/games"
-)
-
-# Create LLM agents
-agent_white = DeepSeekAgent(
-    agent_id="deepseek",
-    agent_name="DeepSeek Reasoner",
-    model="deepseek-reasoner"
-)
-
-agent_black = ChatGPTAgent(
-    agent_id="chatgpt",
-    agent_name="ChatGPT",
-    model="gpt-4o-mini"
-)
-
-# Run game
-results = green_agent.run_game(
-    white_agent=agent_white,
-    black_agent=agent_black,
-    game_id="game_001",
-    max_moves=50
-)
-
-# Results include:
-# - Game outcome (1-0, 0-1, 1/2-1/2)
-# - Complete move history
-# - ACPL for both players
-# - Estimated ELO ratings
-# - Move quality breakdown
-# - Phase-specific performance
-# - HTML report and game replay
-```
-
-## 🎨 Visualization System
-
-### Features
-
-1. **HTML Game Reports**
-   - Player statistics and metrics
-   - Move-by-move analysis
-   - Interactive charts
-   - Professional formatting
-
-2. **Analytics Charts**
-   - ACPL trend over time
-   - Move quality distribution
-   - Thinking time analysis
-   - Phase comparison
-
-3. **Interactive Game Replay**
-   - Graphical chess board (Unicode pieces)
-   - Move navigation (prev/next/first/last)
-   - Move annotations and quality indicators
-   - Stockfish evaluation display
-   - Responsive design
-
-### Output Files
-
-All generated automatically after each game:
-- `logs/{game_id}.json` - Complete game log
-- `logs/{game_id}_report.html` - HTML analysis report
-- `logs/charts/{game_id}_*.png` - Analytics charts
-- `logs/{game_id}_replay.html` - Interactive game replay
-
-See `docs/VISUALIZATION_GUIDE.md` for detailed usage.
-
-## 🤖 Supported LLM Agents
-
-### Implemented Agents
-
-1. **DeepSeek** (`deepseek-reasoner` or `deepseek-chat`)
-   - API: https://api.deepseek.com
-   - Reasoning model for deep analysis (3-4 min/move)
-   - Chat model for faster responses (~30s/move)
-
-2. **ChatGPT** (`gpt-4o-mini`, `gpt-4o`)
-   - API: OpenAI
-   - Fast and reliable (~10-20s/move)
-
-3. **Google Gemini** (`gemini-pro`)
-   - API: Google AI
-   - Good balance of speed and quality
-
-### Sample Agents
-
-- **RandomAgent**: Selects random legal moves
-- **SimpleGreedyAgent**: Prioritizes captures and checks
-
-### Configuration
-
-**API Settings** (`src/config/api_config.py`):
-- `DEFAULT_TIMEOUT`: 180 seconds (3 minutes for reasoning models)
-- `DEFAULT_MAX_TOKENS`: 4096 (allows detailed reasoning output)
-- `DEFAULT_TEMPERATURE`: 0.3 (focused, deterministic play)
-
-**Model Selection**:
-- Use `deepseek-reasoner` for best play quality (slow)
-- Use `deepseek-chat` or `gpt-4o-mini` for faster testing
-- Customize via agent initialization parameters
-
-## 🧪 Testing
-
-### Test Modes
-
-```bash
-# Quick single move test
-python tests/test_llm_agents.py single
-
-# LLM vs Random (fast, 30 moves)
-python tests/test_llm_agents.py quick
-
-# LLM vs LLM (full game, 50 moves)
-python tests/test_llm_agents.py full
-
-# Complete system test (adapts to available APIs)
-python tests/test_complete_system.py
-```
-
-### Test Coverage
-
-- ✅ Environment operations
-- ✅ Agent creation and move generation
-- ✅ Green Agent orchestration
-- ✅ Stockfish evaluation (if available)
-- ✅ Visualization generation
-- ✅ Logging system
-- ✅ End-to-end LLM game flow
-
-## 📚 Documentation
-
-- **[Environment Design](docs/environment_design.md)** - Detailed environment specification
-- **[Metrics Design](docs/METRICS_DESIGN.md)** - Evaluation metrics and thresholds
-- **[Evaluation System](docs/EVALUATION_SYSTEM.md)** - Using Stockfish integration
-- **[Visualization Guide](docs/VISUALIZATION_GUIDE.md)** - Generating and customizing reports
-
-## 🛠️ Technology Stack
-
-- **Chess Engine**: python-chess (board management)
-- **Evaluation Engine**: Stockfish (move analysis)
-- **Data Validation**: Pydantic v2
-- **LLM APIs**: DeepSeek, OpenAI, Google Gemini
-- **Visualization**: Matplotlib, Plotly.js, HTML/CSS/JavaScript
-- **Async Support**: aiohttp, asyncio
-
-## 🔧 Configuration
-
-### ACPL Thresholds
-
-Defined in `src/config/const.py`:
-- Skill level classification
-- Move quality thresholds
-- ACPL to ELO interpolation
-- Game phase boundaries
-
-### API Configuration
-
-Managed in `src/config/api_config.py`:
-- API endpoints and keys
-- Model selections
-- Timeout settings
-- Token limits
-
-## 📝 Logging
-
-All games are automatically logged to `logs/` with:
-- Complete move history with UCI and SAN notation
-- Board states (FEN) after each move
-- LLM reasoning and confidence
-- Stockfish evaluation and CP loss
-- Time spent per move
-- Game result and metrics
-
-## 🚧 Upcoming Features
-
-- [ ] Assessment UI polish for AgentBeats v2
-- [ ] Advanced testing and optimization
-- [ ] Tournament mode (multiple games, statistical analysis)
-- [ ] Custom evaluation profiles
-- [ ] Real-time game monitoring dashboard
-- [ ] Database integration for historical analysis
-
-## 🤝 Contributing
-
-This is a course project for Berkeley CS194. Contributions and suggestions are welcome!
-
-## 📖 References
-
-- [Game Arena (Google DeepMind)](https://github.com/google-deepmind/game_arena) - Inspiration for design
-- [python-chess Documentation](https://python-chess.readthedocs.io/) - Chess engine library
-- [Stockfish](https://stockfishchess.org/) - World's strongest chess engine
-- Course Materials: `LLM Agent Evaluations & Project Overview.pdf`
-
-## 📄 License
-
-Apache License 2.0
 
 ---
+
+## 5. 在 AgentBeats v2 上创建 Assessment
+
+1. 在 AgentBeats 平台分别注册 **两个 controller URL**（green 的 Cloud Run URL、white 的 Cloud Run URL）
+2. 确认两边的 agent check 都能加载到 agent card
+3. 创建 assessment：选择 Green 为 assessor，White 为 participant
+
+---
+
+## 6. White Agent 配置（LLM）
+
+White agent 的 LLM 由以下环境变量控制（Cloud Run 上建议配置）：
+
+- `WHITE_API_PROVIDER`：默认 `deepseek`（可选 `openai` / `google`）
+- `WHITE_MODEL`：默认 `deepseek-chat`
+- `WHITE_USE_COT`：`true/false`（默认 `true`）
+- `WHITE_TIMEOUT`：默认 `60`（单步超时，单位秒）
+
+---
+
+## 7. Green 评测参数（可选）
+
+Green 在 A2A assessment 模式下，会读取：
+
+- `ASSESSMENT_MAX_MOVES`：默认 `20`
+- `ASSESSMENT_BLACK_AGENT`：`greedy`（默认）或 `random`
+- `ASSESSMENT_REMOTE_TIMEOUT`：调用远端 white `/move` 的超时（默认 `60`）
+- `ASSESSMENT_USE_STOCKFISH`：是否用 stockfish（默认 `false`，Cloud Run 上通常不带 stockfish）
+
+---
+
+## 8. 常见问题排查
+
+### 8.1 AgentBeats assessment 报 404
+
+多半是 A2A JSON-RPC 路由缺失或路径不对。AgentBeats 会对 `agent-card.json` 里 `url` 对应的地址 `POST /`（JSON-RPC）。
+
+### 8.2 assessment 报 503 “All connection attempts failed”
+
+几乎都是因为 agent card 的 `url` 指向了不可从外网访问的地址（例如 `http://0.0.0.0:8010/...`）。
+
+检查：
+```powershell
+$green = "https://<green-service-url>"
+$gid = (Invoke-WebRequest -Uri "$green/agents" | ConvertFrom-Json).psobject.Properties.Name | Select-Object -First 1
+(Invoke-WebRequest -Uri "$green/to_agent/$gid/.well-known/agent-card.json" | ConvertFrom-Json).url
+```
+
+确保返回的是 `https://<green-service-url>/to_agent/<id>`。
+
+---
+
+## 9. 项目结构（简版）
+
+```
+src/
+  server.py              # 入口：AGENT_ROLE=green/white
+  green_service.py       # Green HTTP + A2A(JSON-RPC)
+  white_service.py       # White HTTP + A2A(JSON-RPC)
+  a2a_handlers.py        # A2A message/send 实现（green/white）
+  green_agent/           # 评测与对局逻辑（Stockfish 可选）
+  white_agent/           # White agent（LLM-backed）实现
+tests/
+run.sh                   # controller 启动内部 agent 时执行
+Procfile                 # Cloud Run 启动 controller
+```
+
+---
+
+## License
+
+Apache License 2.0
